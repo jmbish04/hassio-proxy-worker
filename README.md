@@ -1,1 +1,22 @@
-IyBIYXNzLmlvIFByb3h5IFdvcmtlcgoKVGhpcyBDbG91ZGZsYXJlIFdvcmtlciBhY3RzIGFzIGEgc2VjdXJlIENPUlMtZnJpZW5kbHkgcHJveHkgdG8gdGhlIEhvbWUgQXNzaXN0YW50IEFQSSwgZW5hYmxpbmcgZnJvbnRlbmQgYW5kIHRoaXJkLXBhcnR5IGFjY2VzcyB0byBIYXNzLmlvIHNlcnZpY2VzLgoKIyMgRmVhdHVyZXMKCi0gUHJveGllcyBhbGwgYC9hcGkvLi4uYHJvdXRlcyB0byB5b3VyIEhvbWUgQXNzaXN0YW50IGluc3RhbmNlCi0gQWRkcyBhcHByb3ByaWF0ZSBDT1JTIChoZWFkZXJzKSBmb3IgcHVibGljIG9yIHJlc3RyaWN0ZWQgYWNjZXNzCi0gRmlsdGVycyBvdXQgYGRldmljZV90cmFja2VyYCBlbnRpdGllcyBmcm9tIGVudGl0eSBkYXRhCi0gSW5jbHVkZXMgYSBXZWJTb2NrZXQgQVBJIENsaWVudCBmb3IgbGl2ZSB1cGRhdGVzIGFuZCBjb250cm9sCgojIyBEZXBsb3kgdG8gQ2xvdWRmbGFyZSBXb3JrZXJzCgpDbGljayB0aGUgYnV0dG9uIGJlbG93IHRvIHF1aWNrbHkgZGVwbG95IHRoaXMgV29ya2VyIHRvIHlvdXIgQ2xvdWRmbGFyZSBhY2NvdW50OgoKWyFbRGVwbG95IHRvIENsb3VkZmxhcmVdKGh0dHBzOi8vZGVwbG95LndvcmtlcnMuY2xvdWRmbGFyZS5jb20vYnV0dG9uKV0oaHR0cHM6Ly9kZXBsb3kud29ya2Vycy5jbG91ZGZsYXJlLmNvbS8/YXVybD1odHRwczovL2dpdGh1Yi5jb20vam1iaXNoMDQvaGFzc2lvLXByb3h5LXdvcmtlcikKCiMjIFNldHVwCgpTZXQgeW91ciBgSE9NRUFTU0lTVEFO
+# Hass.io Proxy Worker
+
+This Cloudflare Worker acts as a secure CORS-friendly proxy to the Home Assistant API, enabling frontend and third-party access to Hass.io services.
+
+## Features
+
+- Proxies all `/api/...` routes to your Home Assistant instance
+- Adds appropriate CORS (headers) for public or restricted access
+- Filters out `device_tracker` entities from entity data
+- Includes a WebSocket API Client for live updates and control
+
+## Deploy to Cloudflare Workers
+
+Click the button below to quickly deploy this Worker to your Cloudflare account:
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/jmbish04/hassio-proxy-worker)
+
+## Setup
+
+Set your `HOMEASSISTANT_TOKEN` in `wrangler.toml` or Cloudflare dashboard
+
+Update the `targetUrl` base in `src/index.js` to match your Nabu Casa URL or local instance
