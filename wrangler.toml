@@ -6,6 +6,7 @@ compatibility_date = "2024-05-01" # Or your desired compatibility date
 # Specifies that this is an ES Module worker
 [vars]
 # __app_id = "your-specific-app-id" # Optional: if you want to override the default-app-id for Firestore paths
+AI_MODEL="@cf/meta/llama-4-scout-17b-16e-instruct"
 
 # Secrets that need to be set in your Cloudflare Worker dashboard or via wrangler secret put
 # wrangler secret put WORKER_API_KEY
@@ -15,7 +16,7 @@ compatibility_date = "2024-05-01" # Or your desired compatibility date
 [[unsafe.bindings]]
 name = "ENV_BINDING"
 type = "vars"
-vars = [ "WORKER_API_KEY", "FIREBASE_CONFIG" ]
+vars = [ "WORKER_API_KEY", "FIREBASE_CONFIG","AI_MODEL"]
 
 # "HOMEASSISTANT_URI", "HOMEASSISTANT_TOKEN"
 
