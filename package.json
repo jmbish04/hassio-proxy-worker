@@ -6,14 +6,16 @@
   "scripts": {
     "start": "wrangler dev",
     "deploy": "wrangler deploy",
-    "migrate": "wrangler d1 migrations apply hassio_db"
+    "db:generate": "drizzle-kit generate:sqlite",
+    "db:migrate": "wrangler d1 migrations apply DB"
   },
   "dependencies": {
     "home-assistant-js-websocket": "^10.1.0",
-    "drizzle-orm": "^0.20.4",
-    "better-sqlite3": "^8.5.2"
+    "drizzle-orm": "^0.20.4"
   },
   "devDependencies": {
-    "wrangler": "^3.51.1"
+    "wrangler": "^3.51.1",
+    "drizzle-kit": "^0.20.0", // Example version, use the latest compatible
+    "better-sqlite3": "^8.5.2" // Keep here as Drizzle Kit might need it for SQLite generation
   }
 }
