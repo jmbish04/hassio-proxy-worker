@@ -22,6 +22,9 @@ vars = [ "WORKER_API_KEY", "FIREBASE_CONFIG" ]
 [observability.logs]
 enabled = true
 
+[ai]
+binding = "AI"
+
 # Enable Node.js compatibility if any Node-specific modules are used indirectly
 # The current code uses Firebase SDK v9+ which is modular and generally worker-friendly,
 # but if issues arise, this might be needed.
