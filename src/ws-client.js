@@ -1,7 +1,7 @@
 import {
   createConnection,
   createLongLivedTokenAuth,
-  subscribeEntities,
+  // subscribeEntities, // We'll use subscribeEvents for state_changed events
   callService,
   getServices,
   getStates,
@@ -10,42 +10,71 @@ import {
   getPanels,
   getLovelaceConfig,
   getCardConfig,
-  subscribeConfig,
-  subscribeServices,
-  subscribePanels,
-  subscribeLovelace,
   getEntityRegistry,
   getDeviceRegistry,
   getAreaRegistry,
+  // For subscribeEvents, we need Connection from the library
+  // It's implicitly available via the connection object returned by createConnection
 } from "home-assistant-js-websocket";
 
-// Firebase imports
-import { initializeApp } from "firebase/app";
-import { 
-  getFirestore,
-  collection,
-  addDoc,
-  query,
-  where,
-  getDocs,
-  orderBy, // Note: orderBy might require composite indexes in Firestore
-  limit,
-  serverTimestamp
-} from "firebase/firestore";
-import { 
-  getAuth, 
-  signInAnonymously, 
-  signInWithCustomToken 
-} from "firebase/auth";
+// Drizzle ORM and D1 imports
+import { drizzle } from 'drizzle-orm/d1';
+import { sqliteTable, text, integer, sql } from 'drizzle-orm/sqlite-core';
+import { count, desc, eq } from 'drizzle-orm'; // Removed 'and' as it's not used in current queries
 
-// --- Home Assistant Client Functions (as before) ---
+
+// --- Drizzle Schema Definition ---
+export const entityInteractionsSchema = sqliteTable('entity_interactions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  entityId: text('entity_id').notNull(),
+  domain: text('domain').notNull(),
+  service: text('service').notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+});
+
+export const homeAssistantEventsSchema = sqliteTable('home_assistant_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  eventType: text('event_type').notNull(),
+  eventData: text('event_data').notNull(), // Store as JSON string
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+});
+// Note: If you want a dedicated table for state changes with old/new state, define it here.
+// For this example, state_changed events will be logged into home_assistant_events.
+
+const schema = {
+    entityInteractionsSchema,
+    homeAssistantEventsSchema,
+    // Add other schema tables here if needed
+};
+
+// --- Globals for D1 and KV ---
+let d1; // Drizzle D1 instance
+let kv; // KV namespace instance
 
 /**
- * Initializes the connection to Home Assistant.
- * @param {string} hassUrl - The URL of the Home Assistant instance (e.g., from env.HOMEASSISTANT_URI).
- * @param {string} accessToken - The Long-Lived Access Token (e.g., from env.HOMEASSISTANT_TOKEN).
- * @returns {Promise<import("home-assistant-js-websocket").Connection>} The Home Assistant connection object.
+ * Initializes Drizzle ORM for D1 and sets up KV if not already initialized.
+ * Must be called before using D1 or KV.
+ * @param {Object} env - Cloudflare Worker environment variables.
  */
+const ensureD1KVInitialized = (env) => {
+  if (!d1 && env.DB) {
+    d1 = drizzle(env.DB, { schema });
+    console.log("Drizzle ORM for D1 initialized.");
+  } else if (!env.DB && !d1) { // Only warn if not already initialized and no DB env
+    console.warn("D1 Database (env.DB) binding not found. D1 features will be unavailable.");
+  }
+
+  if (!kv && env.KV) {
+    kv = env.KV;
+    console.log("KV namespace initialized.");
+  } else if (!env.KV && !kv) { // Only warn if not already initialized and no KV env
+    console.warn("KV Namespace (env.KV) binding not found. KV features will be unavailable.");
+  }
+};
+
+
+// --- Home Assistant Client Functions ---
+
 export const initConnection = async (hassUrl, accessToken) => {
   if (!hassUrl || typeof hassUrl !== 'string') {
     throw new Error("Home Assistant URL (hassUrl) must be a non-empty string.");
@@ -63,14 +92,23 @@ export const initConnection = async (hassUrl, accessToken) => {
   }
 };
 
-/**
- * Fetches all entities from Home Assistant, organizes them by domain,
- * and excludes device_tracker entities.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Object>} An object with domains as keys and entity objects as values.
- */
-export const getAllOrganizedEntities = async (connection) => {
+export const getAllOrganizedEntities = async (connection, env, ctx) => {
   if (!connection) throw new Error("Connection object is required.");
+  
+  const CACHE_KEY = `all-entities-cache:${env.HOMEASSISTANT_URI || 'default_ha_uri'}`;
+  const CACHE_TTL_SECONDS = 60;
+
+  if (kv) {
+    try {
+      const cached = await kv.get(CACHE_KEY, { type: "json" });
+      if (cached) {
+        return cached;
+      }
+    } catch (e) {
+      console.error("KV get error for all entities:", e);
+    }
+  }
+
   const states = await getStates(connection);
   const organizedEntities = {};
   states
@@ -80,15 +118,17 @@ export const getAllOrganizedEntities = async (connection) => {
       if (!organizedEntities[domain]) organizedEntities[domain] = {};
       organizedEntities[domain][entity.entity_id] = entity;
     });
+
+  if (kv && ctx) { // Ensure ctx is available for waitUntil
+    try {
+      ctx.waitUntil(kv.put(CACHE_KEY, JSON.stringify(organizedEntities), { expirationTtl: CACHE_TTL_SECONDS }));
+    } catch (e) {
+      console.error("KV put error for all entities:", e);
+    }
+  }
   return organizedEntities;
 };
 
-/**
- * Gets the state of a single entity.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @param {string} entityId - The ID of the entity.
- * @returns {Promise<Object|null>} The entity state object or null if not found.
- */
 export const getEntityState = async (connection, entityId) => {
     if (!connection) throw new Error("Connection object is required.");
     if (!entityId) throw new Error("Entity ID is required.");
@@ -96,158 +136,62 @@ export const getEntityState = async (connection, entityId) => {
     return states.find(s => s.entity_id === entityId) || null;
 };
 
-
-// (Other HA client functions: getConfiguration, getUserInfo, etc. remain the same)
-// ... (getConfiguration, getUserInfo, getAvailableServices, getAvailablePanels, getLovelaceConfiguration, getCardConfiguration)
-// ... (getEntityRegistryEntries, getDeviceRegistryEntries, getAreaRegistryEntries)
-// ... (Subscription functions also remain largely the same for client-side use if needed)
-
-/**
- * Gets the Home Assistant configuration.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Object>} The Home Assistant configuration object.
- */
 export const getConfiguration = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getConfig(connection);
 };
 
-/**
- * Gets the current user information from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Object>} The user object.
- */
 export const getUserInfo = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getUser(connection);
 };
 
-/**
- * Gets the available services from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Object>} An object describing the available services.
- */
 export const getAvailableServices = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getServices(connection);
 };
 
-/**
- * Gets the available panels (sidebar items) from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Object>} An object describing the available panels.
- */
 export const getAvailablePanels = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getPanels(connection);
 };
 
-/**
- * Gets the Lovelace configuration from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Object>} The Lovelace configuration object.
- */
 export const getLovelaceConfiguration = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getLovelaceConfig(connection);
 };
 
-/**
- * Gets the configuration for a specific Lovelace card.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @param {string} cardId - The ID of the card to retrieve.
- * @returns {Promise<Object>} The card configuration object.
- */
 export const getCardConfiguration = async (connection, cardId) => {
   if (!connection) throw new Error("Connection object is required.");
   if (!cardId || typeof cardId !== 'string') throw new Error("Card ID must be a non-empty string.");
   return getCardConfig(connection, cardId);
 };
 
-/**
- * Gets the entity registry from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Array<Object>>} An array of entity registry entries.
- */
 export const getEntityRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getEntityRegistry(connection);
 };
 
-/**
- * Gets the device registry from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Array<Object>>} An array of device registry entries.
- */
 export const getDeviceRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getDeviceRegistry(connection);
 };
 
-/**
- * Gets the area registry from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
- * @returns {Promise<Array<Object>>} An array of area registry entries.
- */
 export const getAreaRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getAreaRegistry(connection);
 };
 
 
-// --- Firebase Globals ---
-let firebaseApp;
-let firestoreDB;
-let firebaseAuth;
-let currentUserId; // For Firestore user-specific data
-
-/**
- * Initializes Firebase app and services if not already initialized.
- * Must be called before using Firestore or Auth.
- * @param {Object} env - Cloudflare Worker environment variables.
- */
-const ensureFirebaseInitialized = async (env) => {
-  if (!firebaseApp) {
-    if (!env.FIREBASE_CONFIG) {
-      console.error("FIREBASE_CONFIG is not set in environment variables.");
-      throw new Error("Firebase configuration not found.");
-    }
-    try {
-      const firebaseConfig = JSON.parse(env.FIREBASE_CONFIG);
-      firebaseApp = initializeApp(firebaseConfig);
-      firestoreDB = getFirestore(firebaseApp);
-      firebaseAuth = getAuth(firebaseApp);
-      
-      // Authenticate (e.g., anonymously for worker-level operations)
-      // __initial_auth_token is specific to Canvas environment, adapt if needed for direct CF worker.
-      // For a backend worker, anonymous auth is usually sufficient unless you have specific user contexts.
-      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-         await signInWithCustomToken(firebaseAuth, __initial_auth_token);
-      } else {
-         await signInAnonymously(firebaseAuth);
-      }
-      currentUserId = firebaseAuth.currentUser ? firebaseAuth.currentUser.uid : crypto.randomUUID();
-      console.log("Firebase initialized and user authenticated. User ID:", currentUserId);
-
-    } catch (e) {
-      console.error("Firebase initialization error:", e);
-      throw new Error(`Firebase initialization failed: ${e.message}`);
-    }
-  }
-};
-
-
 // Cloudflare Worker fetch handler
 export default {
   async fetch(request, env, ctx) {
-    // Helper function to return JSON responses
     const jsonResponse = (data, status = 200) => {
       return new Response(JSON.stringify(data), {
         status,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, // Added CORS for broader testing
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     };
-     // Handle CORS preflight requests
     if (request.method === 'OPTIONS') {
         return new Response(null, {
             headers: {
@@ -258,17 +202,13 @@ export default {
         });
     }
 
-    // --- 0. Initialize Firebase (must be done before auth checks if auth depends on it) ---
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; // For Firestore paths
     try {
-        await ensureFirebaseInitialized(env);
-    } catch (error) {
-        console.error("Critical: Firebase initialization failed in fetch:", error);
-        return jsonResponse({ error: `Firebase setup failed: ${error.message}` }, 500);
+        ensureD1KVInitialized(env);
+    } catch (initError) {
+        console.error("Critical: D1/KV initialization failed in fetch:", initError);
+        return jsonResponse({ error: `D1/KV setup failed: ${initError.message}` }, 500);
     }
 
-
-    // --- 1. Authorization for Worker API ---
     const requestApiKey = request.headers.get('Authorization');
     if (!env.WORKER_API_KEY) {
         console.error("WORKER_API_KEY is not set in environment variables.");
@@ -278,7 +218,6 @@ export default {
       return jsonResponse({ error: 'Unauthorized to use worker API.' }, 401);
     }
 
-    // --- 2. Retrieve Home Assistant Credentials ---
     const HASS_URI = env.HOMEASSISTANT_URI;
     const HASS_TOKEN = env.HOMEASSISTANT_TOKEN;
 
@@ -289,11 +228,8 @@ export default {
 
     let haConnection;
     try {
-      // --- 3. Initialize Home Assistant Connection ---
       haConnection = await initConnection(HASS_URI, HASS_TOKEN);
-      // console.log("Successfully connected to Home Assistant via worker proxy!");
 
-      // --- 4. API Routing ---
       const url = new URL(request.url);
       const pathParts = url.pathname.split('/').filter(p => p); 
 
@@ -311,11 +247,10 @@ export default {
         }
       }
 
-      // --- 5. Handle Actions ---
       switch (action) {
         case 'entities':
           if (request.method === 'GET') {
-            const entities = await getAllOrganizedEntities(haConnection);
+            const entities = await getAllOrganizedEntities(haConnection, env, ctx);
             return jsonResponse(entities);
           }
           return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
@@ -332,14 +267,14 @@ export default {
             const user = await getUserInfo(haConnection);
             return jsonResponse(user);
           }
-          return jsonResponse({ error: `Method ${request.method} not allowed for /api/user` }, 405);
+          return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
         case 'services':
           if (request.method === 'GET') {
             const services = await getAvailableServices(haConnection);
             return jsonResponse(services);
           }
-          return jsonResponse({ error: `Method ${request.method} not allowed for /api/services` }, 405);
+          return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
         case 'call-service':
           if (request.method === 'POST') {
@@ -349,40 +284,106 @@ export default {
             }
             await callService(haConnection, domain, service, serviceData || {});
             
-            // Log interaction to Firestore
-            if (firestoreDB && serviceData && serviceData.entity_id) {
+            if (d1 && serviceData && serviceData.entity_id) {
               try {
-                const entityId = serviceData.entity_id;
-                const interactionsCollectionPath = `/artifacts/${appId}/users/${currentUserId}/entityInteractions`;
-                await addDoc(collection(firestoreDB, interactionsCollectionPath), {
-                  entityId: Array.isArray(entityId) ? entityId.join(',') : entityId, // Handle single or multiple entity_ids
-                  domain,
-                  service,
-                  timestamp: serverTimestamp(),
-                });
-                // console.log(`Interaction logged for ${entityId}`);
+                const entityIdValue = Array.isArray(serviceData.entity_id) ? serviceData.entity_id.join(',') : serviceData.entity_id;
+                ctx.waitUntil(
+                    d1.insert(entityInteractionsSchema).values({
+                        entityId: entityIdValue,
+                        domain,
+                        service,
+                    }).execute()
+                );
               } catch (logError) {
-                console.error("Firestore logging error:", logError);
-                // Do not fail the main request if logging fails
+                console.error("D1 logging error (call-service):", logError);
               }
             }
             return jsonResponse({ success: true, message: `Service ${domain}.${service} called.` });
           }
           return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
+        
+        case 'capture-ha-activity':
+            if (request.method === 'GET') {
+                if (!haConnection || !haConnection.connected) {
+                    return jsonResponse({ error: "Home Assistant connection not established." }, 500);
+                }
+                if (!d1) {
+                    return jsonResponse({ error: "D1 Database not available for logging events." }, 500);
+                }
 
+                let eventUnsubscribe = null;
+                let capturedEventCount = 0;
+                const maxCaptureDuration = 15000; // Capture for 15 seconds
+
+                try {
+                    console.log("Attempting to subscribe to Home Assistant events...");
+
+                    const eventHandler = async (event) => {
+                        // console.log(`HA Event Received: Type: ${event.event_type}`); // Verbose
+                        capturedEventCount++;
+                        if (d1 && event.event_type && event.data) {
+                            try {
+                                // Asynchronously write to D1 without blocking the event handler
+                                ctx.waitUntil(
+                                    d1.insert(homeAssistantEventsSchema).values({
+                                        eventType: event.event_type,
+                                        eventData: JSON.stringify(event.data), // Ensure data is stringified
+                                    }).execute()
+                                    .catch(dbWriteError => console.error('D1 event insert error:', dbWriteError))
+                                );
+                            } catch (dbError) {
+                                // This catch might not be effective for errors inside waitUntil
+                                console.error('D1 event logging submission error:', dbError);
+                            }
+                        }
+                    };
+                    
+                    // Subscribe to all events. This includes state_changed events.
+                    // The `subscribeEvents` function is asynchronous and returns a promise that resolves to the unsubscribe function.
+                    eventUnsubscribe = await haConnection.subscribeEvents(eventHandler);
+                    console.log("Successfully subscribed to Home Assistant events. Capturing activity...");
+
+                    // Keep the worker alive for a short duration to capture events
+                    await new Promise(resolve => setTimeout(resolve, maxCaptureDuration));
+
+                    return jsonResponse({ 
+                        success: true, 
+                        message: `Captured HA activity for ${maxCaptureDuration / 1000} seconds. ${capturedEventCount} events processed (check D1 logs).`,
+                        eventsCaptured: capturedEventCount 
+                    });
+
+                } catch (subError) {
+                    console.error("Error during HA event subscription or capture:", subError);
+                    return jsonResponse({ error: `Failed to capture HA activity: ${subError.message}` }, 500);
+                } finally {
+                    if (eventUnsubscribe) {
+                        try {
+                            await eventUnsubscribe();
+                            console.log("Unsubscribed from Home Assistant events.");
+                        } catch (unsubError) {
+                            console.error("Error unsubscribing from HA events:", unsubError);
+                        }
+                    }
+                    // The main HA connection is closed in the outer finally block.
+                }
+            }
+            return jsonResponse({ error: `Method ${request.method} not allowed for /api/capture-ha-activity` }, 405);
+
+
+        // ... other cases like panels, lovelace-config, etc.
         case 'panels':
           if (request.method === 'GET') {
             const panels = await getAvailablePanels(haConnection);
             return jsonResponse(panels);
           }
-          return jsonResponse({ error: `Method ${request.method} not allowed for /api/panels` }, 405);
+          return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
         case 'lovelace-config':
            if (request.method === 'GET') {
             const lovelaceConfig = await getLovelaceConfiguration(haConnection);
             return jsonResponse(lovelaceConfig);
           }
-          return jsonResponse({ error: `Method ${request.method} not allowed for /api/lovelace-config` }, 405);
+          return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
         
         case 'card-config':
           if (request.method === 'GET') {
@@ -391,58 +392,46 @@ export default {
             const cardConfig = await getCardConfiguration(haConnection, cardId);
             return jsonResponse(cardConfig);
           }
-          return jsonResponse({ error: `Method ${request.method} not allowed for /api/card-config` }, 405);
+          return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
         case 'entity-registry':
           if (request.method === 'GET') {
             const entities = await getEntityRegistryEntries(haConnection);
             return jsonResponse(entities);
           }
-          return jsonResponse({ error: `Method ${request.method} not allowed for /api/entity-registry` }, 405);
+          return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
         case 'device-registry':
           if (request.method === 'GET') {
             const devices = await getDeviceRegistryEntries(haConnection);
             return jsonResponse(devices);
           }
-          return jsonResponse({ error: `Method ${request.method} not allowed for /api/device-registry` }, 405);
+          return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
         case 'area-registry':
           if (request.method === 'GET') {
             const areas = await getAreaRegistryEntries(haConnection);
             return jsonResponse(areas);
           }
-          return jsonResponse({ error: `Method ${request.method} not allowed for /api/area-registry` }, 405);
+          return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
         
         case 'suggested-entities':
             if (request.method === 'GET') {
-                if (!firestoreDB) return jsonResponse({ error: "Firestore not available for suggestions." }, 500);
+                if (!d1) return jsonResponse({ error: "D1 Database not available for suggestions." }, 500);
                 try {
-                    const interactionsCollectionPath = `/artifacts/${appId}/users/${currentUserId}/entityInteractions`;
-                    const q = query(
-                        collection(firestoreDB, interactionsCollectionPath),
-                        orderBy("timestamp", "desc"), // Get recent interactions
-                        limit(100) // Look at last 100 interactions for suggestions
-                    );
-                    const querySnapshot = await getDocs(q);
-                    const interactionCounts = {};
-                    querySnapshot.forEach((docSnap) => {
-                        const data = docSnap.data();
-                        // Handle cases where entityId might be an array string
-                        const entityIds = data.entityId.includes(',') ? data.entityId.split(',') : [data.entityId];
-                        entityIds.forEach(id => {
-                           interactionCounts[id] = (interactionCounts[id] || 0) + 1;
-                        });
-                    });
-
-                    // Sort by count
-                    const sortedSuggestions = Object.entries(interactionCounts)
-                        .sort(([, countA], [, countB]) => countB - countA)
-                        .map(([entityId, count]) => ({ entityId, count }));
+                    const results = await d1.select({
+                        entityId: entityInteractionsSchema.entityId,
+                        interactionCount: count(entityInteractionsSchema.entityId)
+                    })
+                    .from(entityInteractionsSchema)
+                    .groupBy(entityInteractionsSchema.entityId)
+                    .orderBy(desc(count(entityInteractionsSchema.entityId)))
+                    .limit(10)
+                    .execute();
                     
-                    return jsonResponse(sortedSuggestions.slice(0, 10)); // Return top 10
+                    return jsonResponse(results);
                 } catch (suggestError) {
-                    console.error("Error fetching suggestions:", suggestError);
+                    console.error("Error fetching suggestions from D1:", suggestError);
                     return jsonResponse({ error: `Failed to get suggestions: ${suggestError.message}` }, 500);
                 }
             }
@@ -450,37 +439,31 @@ export default {
 
         case 'ai-entity-insight':
             if (request.method === 'GET') {
-                const entityId = url.searchParams.get('entity_id');
-                if (!entityId) return jsonResponse({ error: 'Missing entity_id query parameter' }, 400);
+                const entityIdParam = url.searchParams.get('entity_id');
+                if (!entityIdParam) return jsonResponse({ error: 'Missing entity_id query parameter' }, 400);
 
                 try {
-                    // 1. Get current entity state from Home Assistant
-                    const entityState = await getEntityState(haConnection, entityId);
-                    if (!entityState) return jsonResponse({ error: `Entity ${entityId} not found.` }, 404);
+                    const entityState = await getEntityState(haConnection, entityIdParam);
+                    if (!entityState) return jsonResponse({ error: `Entity ${entityIdParam} not found.` }, 404);
 
-                    // 2. Get recent interactions for this entity from Firestore
-                    let recentInteractions = [];
-                    if (firestoreDB) {
-                        const interactionsCollectionPath = `/artifacts/${appId}/users/${currentUserId}/entityInteractions`;
-                        const q = query(
-                            collection(firestoreDB, interactionsCollectionPath),
-                            where("entityId", "==", entityId), // Or "array-contains" if entityId was stored in an array
-                            orderBy("timestamp", "desc"),
-                            limit(5)
-                        );
-                        const querySnapshot = await getDocs(q);
-                        querySnapshot.forEach(docSnap => recentInteractions.push(docSnap.data()));
+                    let recentInteractionsD1 = [];
+                    if (d1) {
+                        recentInteractionsD1 = await d1.select()
+                            .from(entityInteractionsSchema)
+                            .where(eq(entityInteractionsSchema.entityId, entityIdParam))
+                            .orderBy(desc(entityInteractionsSchema.timestamp))
+                            .limit(5)
+                            .execute();
                     }
                     
-                    // 3. Call Gemini API
-                    const prompt = `Given the Home Assistant entity "${entityId}" with current state: ${JSON.stringify(entityState)}. Recent interactions with this entity include: ${JSON.stringify(recentInteractions)}. What are some useful insights or common next actions for this entity? Be concise.`;
+                    const prompt = `Given the Home Assistant entity "${entityIdParam}" with current state: ${JSON.stringify(entityState)}. Recent interactions (from D1) with this entity include: ${JSON.stringify(recentInteractionsD1)}. What are some useful insights or common next actions for this entity? Be concise.`;
                     
                     let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
                     const payload = { contents: chatHistory };
-                    const apiKey = ""; // Gemini Flash does not require an explicit key here for Canvas
-                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                    const geminiApiKey = ""; 
+                    const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiApiKey}`;
                     
-                    const geminiResponse = await fetch(apiUrl, {
+                    const geminiResponse = await fetch(geminiApiUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
@@ -494,11 +477,9 @@ export default {
                     
                     const result = await geminiResponse.json();
                     
-                    if (result.candidates && result.candidates.length > 0 &&
-                        result.candidates[0].content && result.candidates[0].content.parts &&
-                        result.candidates[0].content.parts.length > 0) {
+                    if (result.candidates && result.candidates[0]?.content?.parts?.[0]?.text) {
                         const insightText = result.candidates[0].content.parts[0].text;
-                        return jsonResponse({ entityId, state: entityState, insight: insightText, recentInteractions });
+                        return jsonResponse({ entityId: entityIdParam, state: entityState, insight: insightText, recentInteractions: recentInteractionsD1 });
                     } else {
                         console.error("Unexpected Gemini API response structure:", result);
                         return jsonResponse({ error: "Failed to get insight from AI, unexpected response.", details: result }, 500);
@@ -511,6 +492,7 @@ export default {
             }
             return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
+
         default:
           return jsonResponse({ error: `Unknown action: ${action}` }, 404);
       }
@@ -522,9 +504,10 @@ export default {
     } finally {
       if (haConnection && haConnection.connected && typeof haConnection.close === 'function') {
         try {
+            // console.log("Closing Home Assistant connection in main finally block.");
             haConnection.close();
         } catch (closeError) {
-            console.error("Error closing Home Assistant connection:", closeError);
+            console.error("Error closing Home Assistant connection in main finally block:", closeError);
         }
       }
     }
