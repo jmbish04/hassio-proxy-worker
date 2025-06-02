@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "db:generate": "drizzle-kit generate:sqlite",
-    "db:migrate": "wrangler d1 migrations apply DB"
+    "deploy": "npm run db:migrate:remote && wrangler deploy",
+    "db:generate": "drizzle-kit generate:sqlite --config ./drizzle.config.ts",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote"
   },
   "dependencies": {
     "home-assistant-js-websocket": "^10.1.0",
@@ -15,7 +16,7 @@
   },
   "devDependencies": {
     "wrangler": "^3.51.1",
-    "drizzle-kit": "^0.20.0",
+    "drizzle-kit": "^0.20.14",
     "better-sqlite3": "^8.5.2"
   }
 }
