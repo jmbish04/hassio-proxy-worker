@@ -15,7 +15,9 @@ compatibility_date = "2024-05-01" # Or your desired compatibility date
 [[unsafe.bindings]]
 name = "ENV_BINDING"
 type = "vars"
-vars = [ "WORKER_API_KEY", "HOMEASSISTANT_URI", "HOMEASSISTANT_TOKEN", "FIREBASE_CONFIG", "__app_id" ]
+vars = [ "WORKER_API_KEY", "FIREBASE_CONFIG" ]
+
+# "HOMEASSISTANT_URI", "HOMEASSISTANT_TOKEN"
 
 
 # Enable Node.js compatibility if any Node-specific modules are used indirectly
