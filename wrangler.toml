@@ -20,7 +20,7 @@ vars = [ "WORKER_API_KEY", "FIREBASE_CONFIG" ]
 # "HOMEASSISTANT_URI", "HOMEASSISTANT_TOKEN"
 
 [observability.logs]
-enabled = false
+enabled = true
 
 # Enable Node.js compatibility if any Node-specific modules are used indirectly
 # The current code uses Firebase SDK v9+ which is modular and generally worker-friendly,
