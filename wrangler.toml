@@ -1,0 +1,14 @@
+[[kv_namespaces]]
+binding = "HA_KV"
+id = ""
+preview_id = ""
+
+name = "hassio-proxy-worker"
+type = "javascript"
+compatibility_date = "2024-06-01"
+
+[vars]
+HOMEASSISTANT_TOKEN = ""
+
+[env.production.vars]
+HOMEASSISTANT_TOKEN = "your_prod_token_here"
