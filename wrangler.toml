@@ -1,14 +1,56 @@
-[[kv_namespaces]]
-binding = "HA_KV"
-id = ""
-preview_id = ""
+name = "home-assistant-proxy-worker" # Replace with your desired worker name
+main = "src/index.js" # Assuming your worker code is in src/index.js
+compatibility_date = "2024-05-01" # Or your desired compatibility date
+# account_id = "YOUR_ACCOUNT_ID" # Replace with your Cloudflare Account ID
 
-name = "hassio-proxy-worker"
-type = "javascript"
-compatibility_date = "2024-06-01"
-
+# Specifies that this is an ES Module worker
 [vars]
-HOMEASSISTANT_TOKEN = ""
+# __app_id = "your-specific-app-id" # Optional: if you want to override the default-app-id for Firestore paths
 
-[env.production.vars]
-HOMEASSISTANT_TOKEN = "your_prod_token_here"
+# Secrets that need to be set in your Cloudflare Worker dashboard or via wrangler secret put
+# wrangler secret put WORKER_API_KEY
+# wrangler secret put HOMEASSISTANT_URI
+# wrangler secret put HOMEASSISTANT_TOKEN
+# wrangler secret put FIREBASE_CONFIG
+[[unsafe.bindings]]
+name = "ENV_BINDING"
+type = "vars"
+vars = [ "WORKER_API_KEY", "HOMEASSISTANT_URI", "HOMEASSISTANT_TOKEN", "FIREBASE_CONFIG", "__app_id" ]
+
+
+# Enable Node.js compatibility if any Node-specific modules are used indirectly
+# The current code uses Firebase SDK v9+ which is modular and generally worker-friendly,
+# but if issues arise, this might be needed.
+[node_compat]
+# enabled = true
+
+# Example build configuration if you were using a bundler like esbuild or webpack
+# [build]
+# command = "npm run build" # Or your build command
+# upload.format = "modules"
+# upload.dir = "dist"
+# upload.main = "./worker.js"
+
+# If you are not using a build step and your main file (e.g. src/index.js) is directly deployable:
+[rules]
+type = "ESModule"
+globs = ["**/*.js"]
+
+# KV Namespaces, R2 Buckets, D1 Databases, etc., would be defined here if used.
+# The current code uses Firestore, which is an external service, so no local bindings for that.
+
+# Example for enabling Durable Objects if you were to use them
+# [[durable_objects.bindings]]
+# name = "MY_DURABLE_OBJECT"
+# class_name = "MyDurableObject"
+
+# Example for KV Namespace
+[[kv_namespaces]]
+binding = "KV"
+id = "c0ca4c70896e449190ebe463af3027ec"
+
+[[d1_databases]]
+binding="DB"
+database_name = "hassio-agent"
+id = "6fd26ae9-6e97-4293-983d-a4a3074f1aad"
+
