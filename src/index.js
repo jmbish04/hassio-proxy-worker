@@ -21,10 +21,9 @@ async function handleRequest(request) {
     body: request.method !== 'GET' && request.method !== 'HEAD' ? await request.text() : undefined,
   }
 
-  let response = await fetch(targetUrl, init)
-  let resHeaders = new Headers(response.headers)
-
-  // CORS headers
-  resHeaders.set("Access-Control-Allow-Origin", ALLOWED_ORIGINS.includes("*") ? "*" : request.headers.get("Origin"))
-  resHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-  resHeader
+  // Preflight CORS
+  if (request.method === "OPTIONS") {
+    const resHeaders = new Headers()
+    resHeaders.set("Access-Control-Allow-Origin", ALLOWED_ORIGINS.includes("*") ? "*" : request.headers.get("Origin"))
+    resHeaders.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+    resHeaders.set("Access
