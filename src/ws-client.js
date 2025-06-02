@@ -14,30 +14,61 @@ import {
   subscribeServices,
   subscribePanels,
   subscribeLovelace,
-  subscribeEntities as subscribeEntitiesRaw,
+  // subscribeEntities as subscribeEntitiesRaw, // This was duplicated, removed one
   getEntityRegistry,
   getDeviceRegistry,
   getAreaRegistry,
 } from "home-assistant-js-websocket";
 
-// Replace with your Home Assistant instance URL and Long-Lived Access Token
-const HASS_URL = "http://localhost:8123";
-const ACCESS_TOKEN = "YOUR_LONG_LIVED_ACCESS_TOKEN";
+// Constants for HASS_URL and ACCESS_TOKEN are removed.
+// These will now be passed into initConnection.
 
-// Initialize the connection
-export const initConnection = async () => {
-  const auth = createLongLivedTokenAuth(HASS_URL, ACCESS_TOKEN);
-  const connection = await createConnection({ auth });
-  return connection;
+/**
+ * Initializes the connection to Home Assistant.
+ * @param {string} hassUrl - The URL of the Home Assistant instance (e.g., from env.HOMEASSISTANT_URI).
+ * @param {string} accessToken - The Long-Lived Access Token (e.g., from env.HOMEASSISTANT_TOKEN).
+ * @returns {Promise<import("home-assistant-js-websocket").Connection>} The Home Assistant connection object.
+ * @throws {Error} If connection or authentication fails.
+ */
+export const initConnection = async (hassUrl, accessToken) => {
+  // Validate inputs
+  if (!hassUrl || typeof hassUrl !== 'string') {
+    throw new Error("Home Assistant URL (hassUrl) must be a non-empty string.");
+  }
+  if (!accessToken || typeof accessToken !== 'string') {
+    throw new Error("Home Assistant Access Token (accessToken) must be a non-empty string.");
+  }
+
+  try {
+    // Create authentication object using the provided URL and token
+    const auth = createLongLivedTokenAuth(hassUrl, accessToken);
+    // Establish the connection
+    const connection = await createConnection({ auth });
+    return connection;
+  } catch (error) {
+    // Log the error for debugging purposes on the worker side
+    console.error("Failed to connect to Home Assistant:", error);
+    // Re-throw the error or handle it as appropriate for the worker environment
+    // For example, you might want to return a specific response or status code
+    throw new Error(`Connection to Home Assistant failed: ${error.message}`);
+  }
 };
 
-// Fetch all entities, excluding device_tracker entities
+/**
+ * Fetches all entities from Home Assistant, organizes them by domain,
+ * and excludes device_tracker entities.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Object>} An object with domains as keys and entity objects as values.
+ */
 export const getAllOrganizedEntities = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const states = await getStates(connection);
   const organizedEntities = {};
 
   states
-    .filter((entity) => !entity.entity_id.startsWith("device_tracker."))
+    .filter((entity) => entity && entity.entity_id && !entity.entity_id.startsWith("device_tracker."))
     .forEach((entity) => {
       const [domain] = entity.entity_id.split(".");
       if (!organizedEntities[domain]) {
@@ -49,96 +80,270 @@ export const getAllOrganizedEntities = async (connection) => {
   return organizedEntities;
 };
 
-// Example: Call a service
-export const callExampleService = async (connection) => {
-  await callService(connection, "light", "turn_on", {
-    entity_id: "light.living_room",
-  });
+/**
+ * Example function to call a service in Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @param {string} domain - The domain of the service (e.g., "light").
+ * @param {string} service - The service to call (e.g., "turn_on").
+ * @param {Object} [serviceData] - Optional data for the service call (e.g., { entity_id: "light.living_room" }).
+ */
+export const callExampleService = async (connection, domain = "light", service = "turn_on", serviceData = { entity_id: "light.living_room" }) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
+  await callService(connection, domain, service, serviceData);
+  console.log(`Service ${domain}.${service} called with data:`, serviceData);
 };
 
-// Example: Subscribe to state changes
+/**
+ * Subscribes to state changes for entities, excluding device_tracker entities.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @param {function(Object): void} callback - Function to call with filtered entity states.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
 export const subscribeToStateChanges = (connection, callback) => {
-  subscribeEntities(connection, (entities) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
+  if (typeof callback !== 'function') {
+    throw new Error("Callback must be a function.");
+  }
+  // subscribeEntities returns a function to unsubscribe
+  return subscribeEntities(connection, (entities) => {
     const filteredEntities = {};
-    Object.entries(entities).forEach(([entityId, entity]) => {
-      if (!entityId.startsWith("device_tracker.")) {
-        filteredEntities[entityId] = entity;
+    Object.entries(entities).forEach(([entityId, entityState]) => {
+      if (entityId && !entityId.startsWith("device_tracker.")) {
+        filteredEntities[entityId] = entityState;
       }
     });
     callback(filteredEntities);
   });
 };
 
-// Example: Get configuration
+/**
+ * Gets the Home Assistant configuration.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Object>} The Home Assistant configuration object.
+ */
 export const getConfiguration = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const config = await getConfig(connection);
   return config;
 };
 
-// Example: Get user info
+/**
+ * Gets the current user information from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Object>} The user object.
+ */
 export const getUserInfo = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const user = await getUser(connection);
   return user;
 };
 
-// Example: Get services
+/**
+ * Gets the available services from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Object>} An object describing the available services.
+ */
 export const getAvailableServices = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const services = await getServices(connection);
   return services;
 };
 
-// Example: Get panels
+/**
+ * Gets the available panels (sidebar items) from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Object>} An object describing the available panels.
+ */
 export const getAvailablePanels = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const panels = await getPanels(connection);
   return panels;
 };
 
-// Example: Get Lovelace config
+/**
+ * Gets the Lovelace configuration from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Object>} The Lovelace configuration object.
+ */
 export const getLovelaceConfiguration = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const lovelaceConfig = await getLovelaceConfig(connection);
   return lovelaceConfig;
 };
 
-// Example: Get card config
+/**
+ * Gets the configuration for a specific Lovelace card.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @param {string} cardId - The ID of the card to retrieve.
+ * @returns {Promise<Object>} The card configuration object.
+ */
 export const getCardConfiguration = async (connection, cardId) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
+  if (!cardId || typeof cardId !== 'string') {
+    throw new Error("Card ID must be a non-empty string.");
+  }
   const cardConfig = await getCardConfig(connection, cardId);
   return cardConfig;
 };
 
-// Example: Subscribe to config changes
+/**
+ * Subscribes to changes in the Home Assistant configuration.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @param {function(Object): void} callback - Function to call with the updated configuration.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
 export const subscribeToConfigChanges = (connection, callback) => {
-  subscribeConfig(connection, callback);
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
+   if (typeof callback !== 'function') {
+    throw new Error("Callback must be a function.");
+  }
+  return subscribeConfig(connection, callback);
 };
 
-// Example: Subscribe to service changes
+/**
+ * Subscribes to changes in the available services.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @param {function(Object): void} callback - Function to call with the updated services.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
 export const subscribeToServiceChanges = (connection, callback) => {
-  subscribeServices(connection, callback);
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
+   if (typeof callback !== 'function') {
+    throw new Error("Callback must be a function.");
+  }
+  return subscribeServices(connection, callback);
 };
 
-// Example: Subscribe to panel changes
+/**
+ * Subscribes to changes in the available panels.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @param {function(Object): void} callback - Function to call with the updated panels.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
 export const subscribeToPanelChanges = (connection, callback) => {
-  subscribePanels(connection, callback);
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
+   if (typeof callback !== 'function') {
+    throw new Error("Callback must be a function.");
+  }
+  return subscribePanels(connection, callback);
 };
 
-// Example: Subscribe to Lovelace changes
+/**
+ * Subscribes to changes in the Lovelace configuration.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @param {function(Object): void} callback - Function to call with the updated Lovelace configuration.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
 export const subscribeToLovelaceChanges = (connection, callback) => {
-  subscribeLovelace(connection, callback);
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
+  if (typeof callback !== 'function') {
+    throw new Error("Callback must be a function.");
+  }
+  return subscribeLovelace(connection, callback);
 };
 
-// Example: Get entity registry
+/**
+ * Gets the entity registry from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Array<Object>>} An array of entity registry entries.
+ */
 export const getEntityRegistryEntries = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const entities = await getEntityRegistry(connection);
   return entities;
 };
 
-// Example: Get device registry
+/**
+ * Gets the device registry from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Array<Object>>} An array of device registry entries.
+ */
 export const getDeviceRegistryEntries = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const devices = await getDeviceRegistry(connection);
   return devices;
 };
 
-// Example: Get area registry
+/**
+ * Gets the area registry from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - The active Home Assistant connection.
+ * @returns {Promise<Array<Object>>} An array of area registry entries.
+ */
 export const getAreaRegistryEntries = async (connection) => {
+  if (!connection) {
+    throw new Error("Connection object is required.");
+  }
   const areas = await getAreaRegistry(connection);
   return areas;
 };
+
+// Example of how you might use this in your Cloudflare Worker:
+//
+// export default {
+//   async fetch(request, env, ctx) {
+//     try {
+//       // Retrieve secrets from the environment
+//       const HASS_URI = env.HOMEASSISTANT_URI;
+//       const HASS_TOKEN = env.HOMEASSISTANT_TOKEN;
+//
+//       if (!HASS_URI || !HASS_TOKEN) {
+//         return new Response("Home Assistant URI or Token not configured in worker secrets.", { status: 500 });
+//       }
+//
+//       // Initialize connection
+//       const connection = await initConnection(HASS_URI, HASS_TOKEN);
+//       console.log("Successfully connected to Home Assistant!");
+//
+//       // Example: Get all entities
+//       const entities = await getAllOrganizedEntities(connection);
+//       console.log("Fetched entities:", Object.keys(entities).length, "domains");
+//
+//       // Example: Get configuration
+//       // const config = await getConfiguration(connection);
+//       // console.log("Fetched config:", config.location_name);
+//
+//       // Close the connection when done if it's a short-lived request
+//       // For long-lived workers or subscriptions, you might keep it open.
+//       connection.close();
+//
+//       return new Response(JSON.stringify({
+//         message: "Successfully connected and fetched entities.",
+//         entityDomains: Object.keys(entities)
+//       }), {
+//         headers: { 'Content-Type': 'application/json' },
+//       });
+//
+//     } catch (error) {
+//       console.error("Worker error:", error);
+//       return new Response(`Error: ${error.message}`, { status: 500 });
+//     }
+//   },
+// };
