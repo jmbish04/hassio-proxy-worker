@@ -1,7 +1,6 @@
 import {
   createConnection,
   createLongLivedTokenAuth,
-  // subscribeEntities, // We'll use subscribeEvents for state_changed events
   callService,
   getServices,
   getStates,
@@ -13,14 +12,19 @@ import {
   getEntityRegistry,
   getDeviceRegistry,
   getAreaRegistry,
-  // For subscribeEvents, we need Connection from the library
-  // It's implicitly available via the connection object returned by createConnection
+  // Imports for client-side subscription helpers
+  subscribeEntities,
+  subscribeConfig,
+  subscribeServices,
+  subscribePanels,
+  subscribeLovelace,
+  // Connection type is implicitly handled by the connection object
 } from "home-assistant-js-websocket";
 
 // Drizzle ORM and D1 imports
 import { drizzle } from 'drizzle-orm/d1';
 import { sqliteTable, text, integer, sql } from 'drizzle-orm/sqlite-core';
-import { count, desc, eq } from 'drizzle-orm'; // Removed 'and' as it's not used in current queries
+import { count, desc, eq } from 'drizzle-orm';
 
 
 // --- Drizzle Schema Definition ---
@@ -38,36 +42,32 @@ export const homeAssistantEventsSchema = sqliteTable('home_assistant_events', {
   eventData: text('event_data').notNull(), // Store as JSON string
   timestamp: integer('timestamp', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
 });
-// Note: If you want a dedicated table for state changes with old/new state, define it here.
-// For this example, state_changed events will be logged into home_assistant_events.
 
 const schema = {
     entityInteractionsSchema,
     homeAssistantEventsSchema,
-    // Add other schema tables here if needed
 };
 
 // --- Globals for D1 and KV ---
-let d1; // Drizzle D1 instance
-let kv; // KV namespace instance
+let d1;
+let kv;
 
 /**
  * Initializes Drizzle ORM for D1 and sets up KV if not already initialized.
- * Must be called before using D1 or KV.
  * @param {Object} env - Cloudflare Worker environment variables.
  */
 const ensureD1KVInitialized = (env) => {
   if (!d1 && env.DB) {
     d1 = drizzle(env.DB, { schema });
     console.log("Drizzle ORM for D1 initialized.");
-  } else if (!env.DB && !d1) { // Only warn if not already initialized and no DB env
+  } else if (!env.DB && !d1) {
     console.warn("D1 Database (env.DB) binding not found. D1 features will be unavailable.");
   }
 
   if (!kv && env.KV) {
     kv = env.KV;
     console.log("KV namespace initialized.");
-  } else if (!env.KV && !kv) { // Only warn if not already initialized and no KV env
+  } else if (!env.KV && !kv) {
     console.warn("KV Namespace (env.KV) binding not found. KV features will be unavailable.");
   }
 };
@@ -75,6 +75,12 @@ const ensureD1KVInitialized = (env) => {
 
 // --- Home Assistant Client Functions ---
 
+/**
+ * Initializes the connection to Home Assistant.
+ * @param {string} hassUrl - The URL of the Home Assistant instance.
+ * @param {string} accessToken - The Long-Lived Access Token.
+ * @returns {Promise<import("home-assistant-js-websocket").Connection>} HA connection object.
+ */
 export const initConnection = async (hassUrl, accessToken) => {
   if (!hassUrl || typeof hassUrl !== 'string') {
     throw new Error("Home Assistant URL (hassUrl) must be a non-empty string.");
@@ -92,16 +98,24 @@ export const initConnection = async (hassUrl, accessToken) => {
   }
 };
 
+/**
+ * Fetches all entities, organizes them by domain, excludes device_trackers, and uses KV caching.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {Object} env - Cloudflare worker environment for KV access.
+ * @param {Object} ctx - Cloudflare worker execution context for waitUntil.
+ * @returns {Promise<Object>} Organized entities.
+ */
 export const getAllOrganizedEntities = async (connection, env, ctx) => {
   if (!connection) throw new Error("Connection object is required.");
   
   const CACHE_KEY = `all-entities-cache:${env.HOMEASSISTANT_URI || 'default_ha_uri'}`;
   const CACHE_TTL_SECONDS = 60;
 
-  if (kv) {
+  if (kv) { // Check if kv is initialized
     try {
       const cached = await kv.get(CACHE_KEY, { type: "json" });
       if (cached) {
+        // console.log("Returning all entities from KV cache.");
         return cached;
       }
     } catch (e) {
@@ -119,9 +133,10 @@ export const getAllOrganizedEntities = async (connection, env, ctx) => {
       organizedEntities[domain][entity.entity_id] = entity;
     });
 
-  if (kv && ctx) { // Ensure ctx is available for waitUntil
+  if (kv && ctx && typeof ctx.waitUntil === 'function') { // Check if kv and ctx.waitUntil are available
     try {
       ctx.waitUntil(kv.put(CACHE_KEY, JSON.stringify(organizedEntities), { expirationTtl: CACHE_TTL_SECONDS }));
+      // console.log("All entities cached in KV.");
     } catch (e) {
       console.error("KV put error for all entities:", e);
     }
@@ -129,6 +144,12 @@ export const getAllOrganizedEntities = async (connection, env, ctx) => {
   return organizedEntities;
 };
 
+/**
+ * Gets the state of a single entity.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {string} entityId - The ID of the entity.
+ * @returns {Promise<Object|null>} The entity state object or null if not found.
+ */
 export const getEntityState = async (connection, entityId) => {
     if (!connection) throw new Error("Connection object is required.");
     if (!entityId) throw new Error("Entity ID is required.");
@@ -136,47 +157,174 @@ export const getEntityState = async (connection, entityId) => {
     return states.find(s => s.entity_id === entityId) || null;
 };
 
+/**
+ * Example function to call a service in Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {string} domain - The domain of the service.
+ * @param {string} service - The service to call.
+ * @param {Object} [serviceData] - Optional data for the service call.
+ */
+export const callExampleService = async (connection, domain = "light", service = "turn_on", serviceData = { entity_id: "light.living_room" }) => {
+  if (!connection) throw new Error("Connection object is required.");
+  await callService(connection, domain, service, serviceData);
+  console.log(`Service ${domain}.${service} called with data:`, serviceData);
+};
+
+/**
+ * Subscribes to state changes for entities, excluding device_tracker entities. (Client-side helper)
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {function(Object): void} callback - Function to call with filtered entity states.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
+export const subscribeToStateChanges = (connection, callback) => {
+  if (!connection) throw new Error("Connection object is required.");
+  if (typeof callback !== 'function') throw new Error("Callback must be a function.");
+  return subscribeEntities(connection, (entities) => {
+    const filteredEntities = {};
+    Object.entries(entities).forEach(([entityId, entityState]) => {
+      if (entityId && !entityId.startsWith("device_tracker.")) {
+        filteredEntities[entityId] = entityState;
+      }
+    });
+    callback(filteredEntities);
+  });
+};
+
+/**
+ * Gets the Home Assistant configuration.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @returns {Promise<Object>} The HA configuration object.
+ */
 export const getConfiguration = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getConfig(connection);
 };
 
+/**
+ * Gets the current user information from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @returns {Promise<Object>} The user object.
+ */
 export const getUserInfo = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getUser(connection);
 };
 
+/**
+ * Gets the available services from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @returns {Promise<Object>} An object describing the available services.
+ */
 export const getAvailableServices = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getServices(connection);
 };
 
+/**
+ * Gets the available panels (sidebar items) from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @returns {Promise<Object>} An object describing the available panels.
+ */
 export const getAvailablePanels = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getPanels(connection);
 };
 
+/**
+ * Gets the Lovelace configuration from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @returns {Promise<Object>} The Lovelace configuration object.
+ */
 export const getLovelaceConfiguration = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getLovelaceConfig(connection);
 };
 
+/**
+ * Gets the configuration for a specific Lovelace card.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {string} cardId - The ID of the card to retrieve.
+ * @returns {Promise<Object>} The card configuration object.
+ */
 export const getCardConfiguration = async (connection, cardId) => {
   if (!connection) throw new Error("Connection object is required.");
   if (!cardId || typeof cardId !== 'string') throw new Error("Card ID must be a non-empty string.");
   return getCardConfig(connection, cardId);
 };
 
+/**
+ * Subscribes to changes in the Home Assistant configuration. (Client-side helper)
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {function(Object): void} callback - Function to call with the updated configuration.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
+export const subscribeToConfigChanges = (connection, callback) => {
+  if (!connection) throw new Error("Connection object is required.");
+  if (typeof callback !== 'function') throw new Error("Callback must be a function.");
+  return subscribeConfig(connection, callback);
+};
+
+/**
+ * Subscribes to changes in the available services. (Client-side helper)
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {function(Object): void} callback - Function to call with the updated services.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
+export const subscribeToServiceChanges = (connection, callback) => {
+  if (!connection) throw new Error("Connection object is required.");
+  if (typeof callback !== 'function') throw new Error("Callback must be a function.");
+  return subscribeServices(connection, callback);
+};
+
+/**
+ * Subscribes to changes in the available panels. (Client-side helper)
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {function(Object): void} callback - Function to call with the updated panels.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
+export const subscribeToPanelChanges = (connection, callback) => {
+  if (!connection) throw new Error("Connection object is required.");
+  if (typeof callback !== 'function') throw new Error("Callback must be a function.");
+  return subscribePanels(connection, callback);
+};
+
+/**
+ * Subscribes to changes in the Lovelace configuration. (Client-side helper)
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @param {function(Object): void} callback - Function to call with the updated Lovelace configuration.
+ * @returns {Promise<() => void>} A function to unsubscribe.
+ */
+export const subscribeToLovelaceChanges = (connection, callback) => {
+  if (!connection) throw new Error("Connection object is required.");
+  if (typeof callback !== 'function') throw new Error("Callback must be a function.");
+  return subscribeLovelace(connection, callback);
+};
+
+/**
+ * Gets the entity registry from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @returns {Promise<Array<Object>>} An array of entity registry entries.
+ */
 export const getEntityRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getEntityRegistry(connection);
 };
 
+/**
+ * Gets the device registry from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @returns {Promise<Array<Object>>} An array of device registry entries.
+ */
 export const getDeviceRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getDeviceRegistry(connection);
 };
 
+/**
+ * Gets the area registry from Home Assistant.
+ * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
+ * @returns {Promise<Array<Object>>} An array of area registry entries.
+ */
 export const getAreaRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getAreaRegistry(connection);
@@ -284,7 +432,7 @@ export default {
             }
             await callService(haConnection, domain, service, serviceData || {});
             
-            if (d1 && serviceData && serviceData.entity_id) {
+            if (d1 && serviceData && serviceData.entity_id && ctx && typeof ctx.waitUntil === 'function') {
               try {
                 const entityIdValue = Array.isArray(serviceData.entity_id) ? serviceData.entity_id.join(',') : serviceData.entity_id;
                 ctx.waitUntil(
@@ -313,37 +461,31 @@ export default {
 
                 let eventUnsubscribe = null;
                 let capturedEventCount = 0;
-                const maxCaptureDuration = 15000; // Capture for 15 seconds
+                const maxCaptureDuration = 15000; 
 
                 try {
                     console.log("Attempting to subscribe to Home Assistant events...");
 
                     const eventHandler = async (event) => {
-                        // console.log(`HA Event Received: Type: ${event.event_type}`); // Verbose
                         capturedEventCount++;
-                        if (d1 && event.event_type && event.data) {
+                        if (d1 && event.event_type && event.data && ctx && typeof ctx.waitUntil === 'function') {
                             try {
-                                // Asynchronously write to D1 without blocking the event handler
                                 ctx.waitUntil(
                                     d1.insert(homeAssistantEventsSchema).values({
                                         eventType: event.event_type,
-                                        eventData: JSON.stringify(event.data), // Ensure data is stringified
+                                        eventData: JSON.stringify(event.data), 
                                     }).execute()
                                     .catch(dbWriteError => console.error('D1 event insert error:', dbWriteError))
                                 );
                             } catch (dbError) {
-                                // This catch might not be effective for errors inside waitUntil
                                 console.error('D1 event logging submission error:', dbError);
                             }
                         }
                     };
                     
-                    // Subscribe to all events. This includes state_changed events.
-                    // The `subscribeEvents` function is asynchronous and returns a promise that resolves to the unsubscribe function.
                     eventUnsubscribe = await haConnection.subscribeEvents(eventHandler);
                     console.log("Successfully subscribed to Home Assistant events. Capturing activity...");
 
-                    // Keep the worker alive for a short duration to capture events
                     await new Promise(resolve => setTimeout(resolve, maxCaptureDuration));
 
                     return jsonResponse({ 
@@ -364,13 +506,10 @@ export default {
                             console.error("Error unsubscribing from HA events:", unsubError);
                         }
                     }
-                    // The main HA connection is closed in the outer finally block.
                 }
             }
-            return jsonResponse({ error: `Method ${request.method} not allowed for /api/capture-ha-activity` }, 405);
+            return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
-
-        // ... other cases like panels, lovelace-config, etc.
         case 'panels':
           if (request.method === 'GET') {
             const panels = await getAvailablePanels(haConnection);
@@ -492,7 +631,6 @@ export default {
             }
             return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
-
         default:
           return jsonResponse({ error: `Unknown action: ${action}` }, 404);
       }
@@ -504,7 +642,6 @@ export default {
     } finally {
       if (haConnection && haConnection.connected && typeof haConnection.close === 'function') {
         try {
-            // console.log("Closing Home Assistant connection in main finally block.");
             haConnection.close();
         } catch (closeError) {
             console.error("Error closing Home Assistant connection in main finally block:", closeError);
