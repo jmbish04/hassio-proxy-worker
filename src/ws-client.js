@@ -18,7 +18,6 @@ import {
   subscribeServices,
   subscribePanels,
   subscribeLovelace,
-  // Connection type is implicitly handled by the connection object
 } from "home-assistant-js-websocket";
 
 // Drizzle ORM and D1 imports
@@ -74,13 +73,6 @@ const ensureD1KVInitialized = (env) => {
 
 
 // --- Home Assistant Client Functions ---
-
-/**
- * Initializes the connection to Home Assistant.
- * @param {string} hassUrl - The URL of the Home Assistant instance.
- * @param {string} accessToken - The Long-Lived Access Token.
- * @returns {Promise<import("home-assistant-js-websocket").Connection>} HA connection object.
- */
 export const initConnection = async (hassUrl, accessToken) => {
   if (!hassUrl || typeof hassUrl !== 'string') {
     throw new Error("Home Assistant URL (hassUrl) must be a non-empty string.");
@@ -93,29 +85,21 @@ export const initConnection = async (hassUrl, accessToken) => {
     const connection = await createConnection({ auth });
     return connection;
   } catch (error) {
-    console.error("Failed to connect to Home Assistant:", error);
+    // console.error("Failed to connect to Home Assistant:", error); // Already logged by caller in some cases
     throw new Error(`Connection to Home Assistant failed: ${error.message}`);
   }
 };
 
-/**
- * Fetches all entities, organizes them by domain, excludes device_trackers, and uses KV caching.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {Object} env - Cloudflare worker environment for KV access.
- * @param {Object} ctx - Cloudflare worker execution context for waitUntil.
- * @returns {Promise<Object>} Organized entities.
- */
 export const getAllOrganizedEntities = async (connection, env, ctx) => {
   if (!connection) throw new Error("Connection object is required.");
   
   const CACHE_KEY = `all-entities-cache:${env.HOMEASSISTANT_URI || 'default_ha_uri'}`;
   const CACHE_TTL_SECONDS = 60;
 
-  if (kv) { // Check if kv is initialized
+  if (kv) {
     try {
       const cached = await kv.get(CACHE_KEY, { type: "json" });
       if (cached) {
-        // console.log("Returning all entities from KV cache.");
         return cached;
       }
     } catch (e) {
@@ -133,10 +117,9 @@ export const getAllOrganizedEntities = async (connection, env, ctx) => {
       organizedEntities[domain][entity.entity_id] = entity;
     });
 
-  if (kv && ctx && typeof ctx.waitUntil === 'function') { // Check if kv and ctx.waitUntil are available
+  if (kv && ctx && typeof ctx.waitUntil === 'function') {
     try {
       ctx.waitUntil(kv.put(CACHE_KEY, JSON.stringify(organizedEntities), { expirationTtl: CACHE_TTL_SECONDS }));
-      // console.log("All entities cached in KV.");
     } catch (e) {
       console.error("KV put error for all entities:", e);
     }
@@ -144,12 +127,6 @@ export const getAllOrganizedEntities = async (connection, env, ctx) => {
   return organizedEntities;
 };
 
-/**
- * Gets the state of a single entity.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {string} entityId - The ID of the entity.
- * @returns {Promise<Object|null>} The entity state object or null if not found.
- */
 export const getEntityState = async (connection, entityId) => {
     if (!connection) throw new Error("Connection object is required.");
     if (!entityId) throw new Error("Entity ID is required.");
@@ -157,25 +134,12 @@ export const getEntityState = async (connection, entityId) => {
     return states.find(s => s.entity_id === entityId) || null;
 };
 
-/**
- * Example function to call a service in Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {string} domain - The domain of the service.
- * @param {string} service - The service to call.
- * @param {Object} [serviceData] - Optional data for the service call.
- */
 export const callExampleService = async (connection, domain = "light", service = "turn_on", serviceData = { entity_id: "light.living_room" }) => {
   if (!connection) throw new Error("Connection object is required.");
   await callService(connection, domain, service, serviceData);
   console.log(`Service ${domain}.${service} called with data:`, serviceData);
 };
 
-/**
- * Subscribes to state changes for entities, excluding device_tracker entities. (Client-side helper)
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {function(Object): void} callback - Function to call with filtered entity states.
- * @returns {Promise<() => void>} A function to unsubscribe.
- */
 export const subscribeToStateChanges = (connection, callback) => {
   if (!connection) throw new Error("Connection object is required.");
   if (typeof callback !== 'function') throw new Error("Callback must be a function.");
@@ -190,141 +154,71 @@ export const subscribeToStateChanges = (connection, callback) => {
   });
 };
 
-/**
- * Gets the Home Assistant configuration.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @returns {Promise<Object>} The HA configuration object.
- */
 export const getConfiguration = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getConfig(connection);
 };
 
-/**
- * Gets the current user information from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @returns {Promise<Object>} The user object.
- */
 export const getUserInfo = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getUser(connection);
 };
 
-/**
- * Gets the available services from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @returns {Promise<Object>} An object describing the available services.
- */
 export const getAvailableServices = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getServices(connection);
 };
 
-/**
- * Gets the available panels (sidebar items) from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @returns {Promise<Object>} An object describing the available panels.
- */
 export const getAvailablePanels = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getPanels(connection);
 };
 
-/**
- * Gets the Lovelace configuration from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @returns {Promise<Object>} The Lovelace configuration object.
- */
 export const getLovelaceConfiguration = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getLovelaceConfig(connection);
 };
 
-/**
- * Gets the configuration for a specific Lovelace card.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {string} cardId - The ID of the card to retrieve.
- * @returns {Promise<Object>} The card configuration object.
- */
 export const getCardConfiguration = async (connection, cardId) => {
   if (!connection) throw new Error("Connection object is required.");
   if (!cardId || typeof cardId !== 'string') throw new Error("Card ID must be a non-empty string.");
   return getCardConfig(connection, cardId);
 };
 
-/**
- * Subscribes to changes in the Home Assistant configuration. (Client-side helper)
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {function(Object): void} callback - Function to call with the updated configuration.
- * @returns {Promise<() => void>} A function to unsubscribe.
- */
 export const subscribeToConfigChanges = (connection, callback) => {
   if (!connection) throw new Error("Connection object is required.");
   if (typeof callback !== 'function') throw new Error("Callback must be a function.");
   return subscribeConfig(connection, callback);
 };
 
-/**
- * Subscribes to changes in the available services. (Client-side helper)
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {function(Object): void} callback - Function to call with the updated services.
- * @returns {Promise<() => void>} A function to unsubscribe.
- */
 export const subscribeToServiceChanges = (connection, callback) => {
   if (!connection) throw new Error("Connection object is required.");
   if (typeof callback !== 'function') throw new Error("Callback must be a function.");
   return subscribeServices(connection, callback);
 };
 
-/**
- * Subscribes to changes in the available panels. (Client-side helper)
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {function(Object): void} callback - Function to call with the updated panels.
- * @returns {Promise<() => void>} A function to unsubscribe.
- */
 export const subscribeToPanelChanges = (connection, callback) => {
   if (!connection) throw new Error("Connection object is required.");
   if (typeof callback !== 'function') throw new Error("Callback must be a function.");
   return subscribePanels(connection, callback);
 };
 
-/**
- * Subscribes to changes in the Lovelace configuration. (Client-side helper)
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @param {function(Object): void} callback - Function to call with the updated Lovelace configuration.
- * @returns {Promise<() => void>} A function to unsubscribe.
- */
 export const subscribeToLovelaceChanges = (connection, callback) => {
   if (!connection) throw new Error("Connection object is required.");
   if (typeof callback !== 'function') throw new Error("Callback must be a function.");
   return subscribeLovelace(connection, callback);
 };
 
-/**
- * Gets the entity registry from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @returns {Promise<Array<Object>>} An array of entity registry entries.
- */
 export const getEntityRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getEntityRegistry(connection);
 };
 
-/**
- * Gets the device registry from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @returns {Promise<Array<Object>>} An array of device registry entries.
- */
 export const getDeviceRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getDeviceRegistry(connection);
 };
 
-/**
- * Gets the area registry from Home Assistant.
- * @param {import("home-assistant-js-websocket").Connection} connection - Active HA connection.
- * @returns {Promise<Array<Object>>} An array of area registry entries.
- */
 export const getAreaRegistryEntries = async (connection) => {
   if (!connection) throw new Error("Connection object is required.");
   return getAreaRegistry(connection);
@@ -344,19 +238,127 @@ export default {
         return new Response(null, {
             headers: {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD', // Added HEAD for health checks
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization',
             },
         });
     }
 
+    // Initialize D1/KV early for all requests, including health checks
     try {
         ensureD1KVInitialized(env);
     } catch (initError) {
-        console.error("Critical: D1/KV initialization failed in fetch:", initError);
-        return jsonResponse({ error: `D1/KV setup failed: ${initError.message}` }, 500);
+        // If basic D1/KV init fails, it might affect health check too, but health check will report specific D1/KV status.
+        console.error("Critical: D1/KV initialization failed early in fetch:", initError);
     }
 
+    // API Routing
+    const url = new URL(request.url);
+    const pathParts = url.pathname.split('/').filter(p => p);
+
+    if (pathParts.length > 0 && pathParts[0] === 'api' && pathParts[1] === 'health') {
+        // --- Health Check Endpoint ---
+        if (request.method === 'GET' || request.method === 'HEAD') {
+            const HASS_URI_HEALTH = env.HOMEASSISTANT_URI;
+            const HASS_TOKEN_HEALTH = env.HOMEASSISTANT_TOKEN;
+            let overallStatus = "ok";
+            let httpStatus = 200;
+
+            const checks = {
+                worker: "ok",
+                home_assistant_uri_configured: HASS_URI_HEALTH ? "ok" : "error: HOMEASSISTANT_URI not configured",
+                home_assistant_token_configured: HASS_TOKEN_HEALTH ? "ok" : "error: HOMEASSISTANT_TOKEN not configured",
+                home_assistant_connection: "pending",
+                d1_database: "pending",
+                kv_store: "pending",
+            };
+
+            if (!HASS_URI_HEALTH || !HASS_TOKEN_HEALTH) {
+                overallStatus = "error";
+                httpStatus = 503;
+            }
+            
+            // Check Home Assistant Connection
+            let healthHaConnection;
+            if (HASS_URI_HEALTH && HASS_TOKEN_HEALTH) {
+                try {
+                    healthHaConnection = await initConnection(HASS_URI_HEALTH, HASS_TOKEN_HEALTH);
+                    await getConfig(healthHaConnection); // Simple read operation
+                    checks.home_assistant_connection = "ok";
+                } catch (e) {
+                    checks.home_assistant_connection = `error: ${e.message}`;
+                    overallStatus = "error";
+                    httpStatus = 503;
+                } finally {
+                    if (healthHaConnection && healthHaConnection.connected) {
+                        healthHaConnection.close();
+                    }
+                }
+            } else {
+                 checks.home_assistant_connection = "skipped: URI or Token not configured";
+                 overallStatus = "error"; // Critical if not configured
+                 httpStatus = 503;
+            }
+
+
+            // Check D1 Database
+            if (env.DB) {
+                if (d1) {
+                    try {
+                        await d1.select({ value: sql`1` }).execute();
+                        checks.d1_database = "ok";
+                    } catch (e) {
+                        checks.d1_database = `error: ${e.message}`;
+                        overallStatus = "error";
+                        httpStatus = 503;
+                    }
+                } else {
+                    checks.d1_database = "error: D1 binding found but instance not initialized";
+                    overallStatus = "error";
+                    httpStatus = 503;
+                }
+            } else {
+                checks.d1_database = "skipped: D1 binding (DB) not configured";
+                // Not necessarily critical if other parts of the app don't strictly need D1 for health
+            }
+
+            // Check KV Store
+            if (env.KV) {
+                if (kv) {
+                    try {
+                        await kv.get("health-check-dummy-key"); // Operation itself is the test
+                        checks.kv_store = "ok";
+                    } catch (e) {
+                        checks.kv_store = `error: ${e.message}`;
+                        overallStatus = "error";
+                        httpStatus = 503;
+                    }
+                } else {
+                    checks.kv_store = "error: KV binding found but instance not initialized";
+                    overallStatus = "error";
+                    httpStatus = 503;
+                }
+            } else {
+                checks.kv_store = "skipped: KV binding not configured";
+                 // Not necessarily critical
+            }
+            
+            if (request.method === 'HEAD') {
+                return new Response(null, { status: httpStatus });
+            }
+
+            return jsonResponse({
+                status: overallStatus,
+                timestamp: new Date().toISOString(),
+                checks,
+            }, httpStatus);
+        } else {
+            return jsonResponse({ error: `Method ${request.method} not allowed for /api/health` }, 405);
+        }
+    }
+
+
+    // --- Regular API Authorization and Routing ---
     const requestApiKey = request.headers.get('Authorization');
     if (!env.WORKER_API_KEY) {
         console.error("WORKER_API_KEY is not set in environment variables.");
@@ -374,18 +376,15 @@ export default {
       return jsonResponse({ error: "Home Assistant credentials not configured." }, 500);
     }
 
-    let haConnection;
+    let haConnection; // Main HA connection for API calls
     try {
       haConnection = await initConnection(HASS_URI, HASS_TOKEN);
-
-      const url = new URL(request.url);
-      const pathParts = url.pathname.split('/').filter(p => p); 
 
       if (pathParts.length < 2 || pathParts[0] !== 'api') {
         return jsonResponse({ error: 'Invalid API path. Expected /api/<action>' }, 400);
       }
 
-      const action = pathParts[1];
+      const action = pathParts[1]; // pathParts[1] is now safe due to health check being pathParts[1] === 'health'
       let requestBody = {};
       if (request.method === 'POST' || request.method === 'PUT') {
         try {
@@ -632,13 +631,16 @@ export default {
             return jsonResponse({ error: `Method ${request.method} not allowed` }, 405);
 
         default:
-          return jsonResponse({ error: `Unknown action: ${action}` }, 404);
+          // This check is now after the health check, so pathParts[1] will exist if we reach here.
+          return jsonResponse({ error: `Unknown API action: ${action}` }, 404);
       }
 
     } catch (error) {
-      console.error("Worker proxy error:", error);
+      console.error("Worker main error handler:", error);
       const errorMessage = (error instanceof Error) ? error.message : String(error);
-      return jsonResponse({ error: `Worker proxy failed: ${errorMessage}` }, 500);
+      // If haConnection failed to initialize, it might be null here.
+      // The error from initConnection will be caught and re-thrown, then caught here.
+      return jsonResponse({ error: `Worker failed: ${errorMessage}` }, 500);
     } finally {
       if (haConnection && haConnection.connected && typeof haConnection.close === 'function') {
         try {
