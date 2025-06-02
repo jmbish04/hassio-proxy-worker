@@ -1,0 +1,19 @@
+{
+  "name": "hassio-proxy-worker",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrate": "wrangler d1 migrations apply hassio_db"
+  },
+  "dependencies": {
+    "home-assistant-js-websocket": "^10.1.0",
+    "drizzle-orm": "^0.20.4",
+    "better-sqlite3": "^8.5.2"
+  },
+  "devDependencies": {
+    "wrangler": "^3.51.1"
+  }
+}
