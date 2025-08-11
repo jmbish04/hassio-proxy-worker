@@ -1,22 +1,40 @@
-# Hass.io Proxy Worker
+# MCP Cloudflare Worker
 
-This Cloudflare Worker acts as a secure CORS-friendly proxy to the Home Assistant API, enabling frontend and third-party access to Hass.io services.
+This project exposes a minimal [Model Context Protocol](https://github.com/modelcontextprotocol) (MCP) style tool as a Cloudflare Worker using [Hono](https://hono.dev/).
+It provides a simple REST interface that can be called from voice assistants or other clients.
 
 ## Features
+- **Health check** at `/health`
+- **Echo tool** at `/v1/echo` for MCP style interactions
+- **Time endpoint** at `/v1/time` demonstrating fast edge responses
+- Uses **KV** to persist the last echoed message with `waitUntil` for non-blocking writes
 
-- Proxies all `/api/...` routes to your Home Assistant instance
-- Adds appropriate CORS (headers) for public or restricted access
-- Filters out `device_tracker` entities from entity data
-- Includes a WebSocket API Client for live updates and control
+## Development
 
-## Deploy to Cloudflare Workers
+Install dependencies:
+```bash
+npm install
+```
 
-Click the button below to quickly deploy this Worker to your Cloudflare account:
+Run the worker locally:
+```bash
+npm run dev
+```
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/jmbish04/hassio-proxy-worker)
+Run tests:
+```bash
+npm test
+```
 
-## Setup
+## Deployment
 
-Set your `HOMEASSISTANT_TOKEN` in `wrangler.toml` or Cloudflare dashboard
+Ensure `wrangler.toml` is configured with your account details and KV namespace.
+Then deploy using:
+```bash
+npm run deploy
+```
 
-Update the `targetUrl` base in `src/index.js` to match your Nabu Casa URL or local instance
+## Edge optimisation
+- Responses are served from Cloudflare's edge network for low latency.
+- The time endpoint uses caching headers so repeat requests are served efficiently.
+- Background writes to KV use `waitUntil` to avoid blocking the response.
