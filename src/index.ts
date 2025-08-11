@@ -1,32 +1,70 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono';
+import { v1 } from './routes/v1';
 
-// Define expected bindings for the worker environment
-interface Env {
-  KV: KVNamespace
+export interface Env {
+  D1_DB: D1Database;
+  KV: KVNamespace;
+  R2_BUCKET: R2Bucket;
 }
 
-// Initialize Hono app with typed bindings
-const app = new Hono<{ Bindings: Env }>()
+const app = new Hono<{ Bindings: Env }>();
 
-// Basic health endpoint
 app.get('/health', (c) => {
-  return c.json({ ok: true })
-})
+  return c.json({ ok: true, uptime: (process as any).uptime?.() ?? null, env: { ready: true } });
+});
 
-// Echo endpoint demonstrating MCP-style tool behaviour
-app.post('/v1/echo', async (c) => {
-  const body = await c.req.json<{ message: string }>()
-  // Store last message asynchronously using KV to leverage edge workers
-  c.executionCtx.waitUntil(c.env.KV.put('lastMessage', body.message))
-  return c.json({ ok: true, echo: body.message })
-})
+// Minimal docs
+app.get('/', (c) => {
+  return c.text('hassio-proxy-worker up. See /openapi.json and /v1/*');
+});
 
-// Time endpoint showcasing fast edge response
-app.get('/v1/time', () => {
-  return new Response(JSON.stringify({ ok: true, time: new Date().toISOString() }), {
-    headers: { 'content-type': 'application/json', 'cache-control': 'max-age=60' },
-  })
-})
+// OpenAPI placeholder
+app.get('/openapi.json', (c) => {
+  const spec = {
+    openapi: '3.1.0',
+    info: {
+      title: 'Alexa Skill REST API',
+      version: '0.1.0',
+      description:
+        'Minimal Alexa-friendly API. All responses use { ok, speech, card?, data }. Stubbed for draft.'
+    },
+    servers: [{ url: 'https://example.workers.dev' }],
+    paths: {
+      '/v1/devices/scan': {
+        post: {
+          summary: 'Scan LAN and update device inventory (stub)',
+          responses: { '200': { description: 'OK' } }
+        }
+      },
+      '/v1/devices': {
+        get: { summary: 'List devices (stub)', responses: { '200': { description: 'OK' } } }
+      },
+      '/v1/devices/{id}': {
+        get: {
+          summary: 'Get device detail (stub)',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: { '200': { description: 'OK' } }
+        }
+      },
+      '/v1/protect/sync': {
+        post: { summary: 'Sync UniFi Protect cameras (stub)', responses: { '200': { description: 'OK' } } }
+      },
+      '/v1/protect/cameras': {
+        get: { summary: 'List cameras (stub)', responses: { '200': { description: 'OK' } } }
+      },
+      '/v1/protect/cameras/{id}/snapshot': {
+        post: {
+          summary: 'Capture snapshot (stub)',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: { '200': { description: 'OK' } }
+        }
+      }
+    }
+  };
+  return c.json(spec);
+});
 
-// Export default for Cloudflare Worker
-export default app
+// Mount /v1 group
+app.route('/v1', v1);
+
+export default app;

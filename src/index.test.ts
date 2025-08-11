@@ -1,33 +1,27 @@
-import { describe, expect, it } from 'vitest'
-import app from './index'
+import { describe, expect, it } from 'vitest';
+import app from './index';
 
-// Simple KV mock for tests
-const kvMock = {
-  async get() { return null },
-  async put() { },
-  async delete() { }
-}
+// Simple mocks for bindings
+const bindings = {
+  D1_DB: {} as any,
+  KV: { async get() {}, async put() {}, async delete() {} } as any,
+  R2_BUCKET: {} as any
+};
+const ctx = { waitUntil() {} } as any;
 
-const ctx = {
-  waitUntil() { /* noop */ }
-}
-
-describe('MCP Worker', () => {
+describe('Alexa REST API scaffold', () => {
   it('responds to health check', async () => {
-    const res = await app.request('/health', {}, { KV: kvMock } as any, ctx as any)
-    expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(data.ok).toBe(true)
-  })
+    const res = await app.request('/health', {}, bindings, ctx);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+  });
 
-  it('echoes messages', async () => {
-    const res = await app.request('/v1/echo', {
-      method: 'POST',
-      body: JSON.stringify({ message: 'hi' }),
-      headers: { 'content-type': 'application/json' }
-    }, { KV: kvMock } as any, ctx as any)
-    expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(data).toEqual({ ok: true, echo: 'hi' })
-  })
-})
+  it('returns stub device scan', async () => {
+    const res = await app.request('/v1/devices/scan', { method: 'POST' }, bindings, ctx);
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.ok).toBe(true);
+    expect(data.data).toEqual({ added: 0, updated: 0, total: 0, reportUrl: null });
+  });
+});

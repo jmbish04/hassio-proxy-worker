@@ -1,10 +1,17 @@
-name = "mcp-tool-worker"
-main = "src/index.ts"
-compatibility_date = "2024-09-01"
+name = "hassio-proxy-worker"
+main = "dist/index.js"
+compatibility_date = "2025-08-01"
 
-[vars]
-# Add environment variables here
+# Placeholders so we don’t touch this again next PR
+[[d1_databases]]
+binding = "D1_DB"
+database_name = "hassio_proxy_db"
+database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
 [[kv_namespaces]]
 binding = "KV"
-id = "00000000000000000000000000000000"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "hassio-proxy-artifacts"
