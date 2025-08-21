@@ -12,7 +12,20 @@ const bindings = {
       };
     }
   } as any,
-  KV: { async get() {}, async put() {}, async delete() {} } as any,
+  CONFIG_KV: {
+    store: {} as Record<string, string>,
+    async get(key: string) {
+      return this.store[key];
+    },
+    async put(key: string, value: string) {
+      this.store[key] = value;
+    },
+    async delete(key: string) {
+      delete this.store[key];
+    }
+  } as any,
+  SESSIONS_KV: { async get() {}, async put() {}, async delete() {} } as any,
+  CACHE_KV: { async get() {}, async put() {}, async delete() {} } as any,
   LOGS_BUCKET: { async put() {} } as any,
   AI: { async run() { return { response: 'diag' }; } } as any,
   WEBSOCKET_SERVER: {
@@ -53,5 +66,34 @@ describe('Alexa REST API scaffold', () => {
     const data = await res.json();
     expect(data.ok).toBe(true);
     expect(data.data?.key).toBeDefined();
+  });
+
+  it('stores and retrieves worker state', async () => {
+    const putRes = await app.request(
+      '/v1/worker/state/test',
+      { method: 'PUT', body: 'value' },
+      bindings,
+      ctx
+    );
+    expect(putRes.status).toBe(200);
+
+    const res = await app.request('/v1/worker/state/test', {}, bindings, ctx);
+    const data = await res.json();
+    expect(data.data).toEqual({ key: 'test', value: 'value' });
+  });
+
+  it('proxies Home Assistant state', async () => {
+    bindings.CONFIG_KV.store['instance:abc'] = JSON.stringify({ baseUrl: 'https://ha', token: 't' });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url: any, init?: any) => {
+      expect(url).toBe('https://ha/api/states/light.kitchen');
+      expect(init.headers.Authorization).toBe('Bearer t');
+      return new Response(JSON.stringify({ state: 'on' }), { status: 200 });
+    };
+
+    const res = await app.request('/v1/ha/abc/states/light.kitchen', {}, bindings, ctx);
+    const data = await res.json();
+    expect(data.data.state).toBe('on');
+    globalThis.fetch = originalFetch;
   });
 });
