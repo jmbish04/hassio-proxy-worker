@@ -1,10 +1,15 @@
 import { Hono } from 'hono';
 import { v1 } from './routes/v1';
+import type { HomeAssistantWebSocket } from './durable-objects/homeAssistant';
 
 export interface Env {
   D1_DB: D1Database;
-  KV: KVNamespace;
-  R2_BUCKET: R2Bucket;
+  CONFIG_KV: KVNamespace;
+  SESSIONS_KV: KVNamespace;
+  CACHE_KV: KVNamespace;
+  LOGS_BUCKET: R2Bucket;
+  AI: Ai;
+  WEBSOCKET_SERVER: DurableObjectNamespace<HomeAssistantWebSocket>;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -66,5 +71,12 @@ app.get('/openapi.json', (c) => {
 
 // Mount /v1 group
 app.route('/v1', v1);
+
+app.get('/ws/:instanceId', (c) => {
+  const { instanceId } = c.req.param();
+  const id = c.env.WEBSOCKET_SERVER.idFromName(instanceId);
+  const stub = c.env.WEBSOCKET_SERVER.get(id);
+  return stub.fetch(c.req.raw);
+});
 
 export default app;

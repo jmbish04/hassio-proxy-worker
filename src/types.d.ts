@@ -5,3 +5,18 @@ declare interface KVNamespace {
   delete(key: string): Promise<any>;
 }
 declare interface R2Bucket {}
+
+declare interface Ai {
+  run(model: string, input: any): Promise<{ response: string }>;
+}
+
+interface DurableObjectId {}
+
+interface DurableObjectStub {
+  fetch(request: Request): Promise<Response>;
+}
+
+declare interface DurableObjectNamespace<T = any> {
+  idFromName(name: string): DurableObjectId;
+  get(id: DurableObjectId): DurableObjectStub;
+}
