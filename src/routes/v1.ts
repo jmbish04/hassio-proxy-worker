@@ -34,7 +34,7 @@ v1.post('/protect/cameras/:id/snapshot', async (c) => {
 
 v1.post('/webhooks/logs', async (c) => {
   const log = await c.req.json();
-  const key = `logs/${Date.now()}-${Math.random().toString(16).slice(2)}.json`;
+  const key = `logs/${Date.now()}-${crypto.randomUUID()}.json`;
   await c.env.LOGS_BUCKET.put(key, JSON.stringify(log));
 
   if (/error/i.test(JSON.stringify(log))) {
