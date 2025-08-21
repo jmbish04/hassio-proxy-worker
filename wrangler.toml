@@ -2,6 +2,9 @@ name = "hassio-proxy-worker"
 main = "dist/index.js"
 compatibility_date = "2025-08-01"
 
+[ai]
+binding = "AI"
+
 # Placeholders so we don’t touch this again next PR
 [[d1_databases]]
 binding = "D1_DB"
@@ -13,5 +16,9 @@ binding = "KV"
 id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 
 [[r2_buckets]]
-binding = "R2_BUCKET"
+binding = "LOGS_BUCKET"
 bucket_name = "hassio-proxy-artifacts"
+
+[[durable_objects.bindings]]
+name = "WEBSOCKET_SERVER"
+class_name = "HomeAssistantWebSocket"
