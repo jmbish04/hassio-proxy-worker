@@ -1,22 +1,24 @@
-# Hass.io Proxy Worker
+# hassio-proxy-worker (draft scaffold)
 
-This Cloudflare Worker acts as a secure CORS-friendly proxy to the Home Assistant API, enabling frontend and third-party access to Hass.io services.
+This draft sets the foundation for an **Alexa-skill REST API**:
 
-## Features
+- `/v1/*` endpoints return Alexa-friendly JSON `{ ok, speech, card?, data }`.
+- `/openapi.json` publishes a placeholder spec for skill-side integration.
+- `wrangler.toml` now points to **dist/index.js** and includes placeholder bindings for **D1**, **KV**, **R2**.
+- TypeScript build pipeline via `tsconfig.json` and `pnpm build`.
 
-- Proxies all `/api/...` routes to your Home Assistant instance
-- Adds appropriate CORS (headers) for public or restricted access
-- Filters out `device_tracker` entities from entity data
-- Includes a WebSocket API Client for live updates and control
+## Dev
+```bash
+pnpm i
+pnpm dev
+```
 
-## Deploy to Cloudflare Workers
+## Deploy
+```bash
+pnpm deploy
+```
 
-Click the button below to quickly deploy this Worker to your Cloudflare account:
-
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/jmbish04/hassio-proxy-worker)
-
-## Setup
-
-Set your `HOMEASSISTANT_TOKEN` in `wrangler.toml` or Cloudflare dashboard
-
-Update the `targetUrl` base in `src/index.js` to match your Nabu Casa URL or local instance
+## Next
+- Implement LAN scan (via Tunnel) and D1 upsert in `/v1/devices/scan`.
+- Implement UniFi Protect client and snapshot-to-R2 in `/v1/protect/*`.
+- Add tracing tables (`events`, `actions`) and KV rate limiting middleware.
