@@ -10,7 +10,7 @@ This guide provides comprehensive instructions for building a Cloudflare Workers
 
 ```toml
 # wrangler.toml
-name = "homeassistant-integration"
+name = "hassio-proxy-worker"
 main = "src/index.ts"
 compatibility_date = "2024-10-22"
 
