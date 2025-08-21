@@ -37,7 +37,7 @@ v1.post('/webhooks/logs', async (c) => {
   const key = `logs/${Date.now()}-${crypto.randomUUID()}.json`;
   await c.env.LOGS_BUCKET.put(key, JSON.stringify(log));
 
-  if (/error/i.test(JSON.stringify(log))) {
+  if (typeof log?.level === 'string' && log.level.toUpperCase() === 'ERROR') {
     try {
       const analysis = await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
         prompt: `Analyze Home Assistant log and provide diagnostics:\n${JSON.stringify(log)}`,
