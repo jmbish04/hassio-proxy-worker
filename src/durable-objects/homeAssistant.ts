@@ -43,7 +43,9 @@ export class HomeAssistantWebSocket implements DurableObject {
   private async ensureHaSocket(instanceId: string) {
     if (this.haSocket && this.haSocket.readyState <= 1) return;
 
-    const config = await getInstanceConfig(this.env, instanceId);
+    const config = this.env.HASSIO_ENDPOINT_URI && this.env.HASSIO_TOKEN
+      ? { baseUrl: this.env.HASSIO_ENDPOINT_URI, token: this.env.HASSIO_TOKEN }
+      : await getInstanceConfig(this.env, instanceId);
     if (!config) return;
 
     const wsUrl = config.baseUrl.replace(/^http/, 'ws') + '/api/websocket';

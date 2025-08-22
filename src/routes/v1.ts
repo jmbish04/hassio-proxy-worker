@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { ok } from '../lib/response';
 import type { Env } from '../index';
 import { haFetch } from '../lib/homeAssistant';
+import { getHaClient } from '../lib/homeAssistantWs';
 
 
 export const v1 = new Hono<{ Bindings: Env }>();
@@ -99,4 +100,11 @@ v1.post('/ha/:instanceId/services/:domain/:service', async (c) => {
   });
   const data = await res.json();
   return c.json(ok('service called', data));
+});
+
+// Generic Home Assistant WebSocket command endpoint using worker-configured instance
+v1.post('/ha/ws', async (c) => {
+  const command = await c.req.json();
+  const data = await getHaClient(c.env).send(command);
+  return c.json(ok('ws response', data));
 });
