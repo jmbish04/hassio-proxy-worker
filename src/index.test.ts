@@ -99,4 +99,40 @@ describe('Alexa REST API scaffold', () => {
     expect(data.data.state).toBe('on');
     globalThis.fetch = originalFetch;
   });
+
+  it('validates WebSocket command is a JSON object', async () => {
+    // Test with invalid input - string instead of object
+    let res = await app.request(
+      '/v1/ha/ws',
+      { method: 'POST', body: JSON.stringify('invalid string') },
+      bindings,
+      ctx
+    );
+    expect(res.status).toBe(400);
+    let data = await res.json();
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe('Request body must be a JSON object');
+
+    // Test with invalid input - array instead of object
+    res = await app.request(
+      '/v1/ha/ws',
+      { method: 'POST', body: JSON.stringify(['invalid', 'array']) },
+      bindings,
+      ctx
+    );
+    expect(res.status).toBe(400);
+    data = await res.json();
+    expect(data.ok).toBe(false);
+    
+    // Test with invalid input - null
+    res = await app.request(
+      '/v1/ha/ws',
+      { method: 'POST', body: JSON.stringify(null) },
+      bindings,
+      ctx
+    );
+    expect(res.status).toBe(400);
+    data = await res.json();
+    expect(data.ok).toBe(false);
+  });
 });
