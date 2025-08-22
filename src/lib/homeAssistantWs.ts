@@ -66,6 +66,12 @@ export class HaWebSocketClient {
         reject(err);
         this.socket = undefined;
         this.authPromise = undefined;
+
+        // Reject all pending requests to prevent callers from hanging
+        for (const p of this.pending.values()) {
+          p.reject(err);
+        }
+        this.pending.clear();
       };
 
       sock.addEventListener('close', () => fail(new Error('socket closed')));

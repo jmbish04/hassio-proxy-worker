@@ -5,15 +5,36 @@ class MockSocket extends EventTarget {
   static instances: MockSocket[] = [];
   readyState = 0;
   sent: string[] = [];
+  private sentPromiseResolve?: () => void;
+  private sentPromise?: Promise<void>;
+  
   constructor(public url: string) {
     super();
     MockSocket.instances.push(this);
   }
+  
   send(data: string) {
     this.sent.push(data);
+    // Resolve any waiting promise when a message is sent
+    if (this.sentPromiseResolve) {
+      this.sentPromiseResolve();
+      this.sentPromiseResolve = undefined;
+      this.sentPromise = undefined;
+    }
   }
+  
   close() {
     this.readyState = 3;
+  }
+  
+  // Helper method to wait for a message to be sent
+  waitForSent(): Promise<void> {
+    if (!this.sentPromise) {
+      this.sentPromise = new Promise((resolve) => {
+        this.sentPromiseResolve = resolve;
+      });
+    }
+    return this.sentPromise;
   }
 }
 
@@ -32,7 +53,7 @@ describe('HaWebSocketClient', () => {
     ws.dispatchEvent(new Event('open'));
     expect(JSON.parse(ws.sent[0])).toEqual({ type: 'auth', access_token: 'abc' });
     ws.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'auth_ok' }) }));
-    await new Promise((r) => setTimeout(r, 0));
+    await ws.waitForSent();
     const sent = JSON.parse(ws.sent[1]);
     expect(sent.type).toBe('get_states');
     const id = sent.id;
@@ -52,7 +73,7 @@ describe('HaWebSocketClient', () => {
     ws.readyState = 1;
     ws.dispatchEvent(new Event('open'));
     ws.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'auth_ok' }) }));
-    await new Promise((r) => setTimeout(r, 0));
+    await ws.waitForSent();
     const sent = JSON.parse(ws.sent[1]);
     expect(sent.type).toBe('call_service');
     expect(sent.domain).toBe('light');

@@ -52,6 +52,7 @@ v1.post('/webhooks/logs', async (c) => {
       ).bind(id, key, analysis.response, Date.now()).run();
     } catch (err) {
       // swallow errors to avoid failing webhook
+      console.error('Error during log analysis:', err);
     }
   }
 
@@ -105,6 +106,9 @@ v1.post('/ha/:instanceId/services/:domain/:service', async (c) => {
 // Generic Home Assistant WebSocket command endpoint using worker-configured instance
 v1.post('/ha/ws', async (c) => {
   const command = await c.req.json();
+  if (typeof command !== 'object' || command === null || Array.isArray(command)) {
+    return c.json({ ok: false, error: 'Request body must be a JSON object' }, 400);
+  }
   const data = await getHaClient(c.env).send(command);
   return c.json(ok('ws response', data));
 });
