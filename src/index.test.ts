@@ -35,7 +35,9 @@ const bindings = {
     get() {
       return { fetch: () => new Response('not implemented', { status: 501 }) } as any;
     }
-  } as any
+  } as any,
+  HASSIO_ENDPOINT_URI: 'https://ha',
+  HASSIO_TOKEN: 'token'
 };
 const ctx = { waitUntil() {} } as any;
 

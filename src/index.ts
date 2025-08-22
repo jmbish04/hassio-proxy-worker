@@ -10,6 +10,8 @@ export interface Env {
   LOGS_BUCKET: R2Bucket;
   AI: Ai;
   WEBSOCKET_SERVER: DurableObjectNamespace<HomeAssistantWebSocket>;
+  HASSIO_ENDPOINT_URI: string;
+  HASSIO_TOKEN: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();

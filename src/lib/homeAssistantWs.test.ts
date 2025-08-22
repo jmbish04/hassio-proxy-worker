@@ -1,0 +1,67 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { HaWebSocketClient } from './homeAssistantWs';
+
+class MockSocket extends EventTarget {
+  static instances: MockSocket[] = [];
+  readyState = 0;
+  sent: string[] = [];
+  constructor(public url: string) {
+    super();
+    MockSocket.instances.push(this);
+  }
+  send(data: string) {
+    this.sent.push(data);
+  }
+  close() {
+    this.readyState = 3;
+  }
+}
+
+beforeEach(() => {
+  MockSocket.instances = [];
+  // @ts-ignore
+  globalThis.WebSocket = MockSocket;
+});
+
+describe('HaWebSocketClient', () => {
+  it('authenticates and returns responses', async () => {
+    const client = new HaWebSocketClient('http://ha', 'abc');
+    const resultPromise = client.getStates();
+    const ws = MockSocket.instances[0];
+    ws.readyState = 1;
+    ws.dispatchEvent(new Event('open'));
+    expect(JSON.parse(ws.sent[0])).toEqual({ type: 'auth', access_token: 'abc' });
+    ws.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'auth_ok' }) }));
+    await new Promise((r) => setTimeout(r, 0));
+    const sent = JSON.parse(ws.sent[1]);
+    expect(sent.type).toBe('get_states');
+    const id = sent.id;
+    ws.dispatchEvent(
+      new MessageEvent('message', {
+        data: JSON.stringify({ id, type: 'result', result: [{ entity_id: 'light.kitchen' }] })
+      })
+    );
+    const res = await resultPromise;
+    expect(res.result[0].entity_id).toBe('light.kitchen');
+  });
+
+  it('sends call_service command', async () => {
+    const client = new HaWebSocketClient('http://ha', 'abc');
+    const resultPromise = client.callService('light', 'turn_on', { entity_id: 'light.kitchen' });
+    const ws = MockSocket.instances[0];
+    ws.readyState = 1;
+    ws.dispatchEvent(new Event('open'));
+    ws.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'auth_ok' }) }));
+    await new Promise((r) => setTimeout(r, 0));
+    const sent = JSON.parse(ws.sent[1]);
+    expect(sent.type).toBe('call_service');
+    expect(sent.domain).toBe('light');
+    const id = sent.id;
+    ws.dispatchEvent(
+      new MessageEvent('message', { data: JSON.stringify({ id, type: 'result', success: true }) })
+    );
+    const res = await resultPromise;
+    expect(res.success).toBe(true);
+  });
+});
+
