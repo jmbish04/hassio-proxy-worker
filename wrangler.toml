@@ -1,4 +1,4 @@
-name = "hassio-proxy-worker"
+name = "mcp-tool-worker"
 main = "dist/index.js"
 compatibility_date = "2025-08-01"
 
