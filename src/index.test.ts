@@ -33,7 +33,7 @@ const bindings: Env = {
   SESSIONS_KV: { async get() {}, async put() {}, async delete() {} } as any,
   CACHE_KV: { async get() {}, async put() {}, async delete() {} } as any,
   LOGS_BUCKET: { async put() {} } as any,
-  AI: { async run() { return { response: 'diag' }; } } as any,
+  AI: { async run() { return { response: 'mocked summary' }; } } as any,
   WEBSOCKET_SERVER: {
     idFromName() {
       return {} as any;
@@ -51,14 +51,14 @@ describe('Alexa REST API scaffold', () => {
   it('responds to health check', async () => {
     const res = await app.request('/health', {}, bindings, ctx);
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await res.json() as { ok: boolean };
     expect(data.ok).toBe(true);
   });
 
   it('returns stub device scan', async () => {
     const res = await app.request('/v1/devices/scan', { method: 'POST' }, bindings, ctx);
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await res.json() as any;
     expect(data.ok).toBe(true);
     expect(data.data).toEqual({ added: 0, updated: 0, total: 0, reportUrl: null });
   });
@@ -71,7 +71,7 @@ describe('Alexa REST API scaffold', () => {
       ctx
     );
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await res.json() as any;
     expect(data.ok).toBe(true);
     expect(data.data?.key).toBeDefined();
   });
@@ -86,7 +86,7 @@ describe('Alexa REST API scaffold', () => {
     expect(putRes.status).toBe(200);
 
     const res = await app.request('/v1/worker/state/test', {}, bindings, ctx);
-    const data = await res.json();
+    const data = await res.json() as any;
     expect(data.data).toEqual({ key: 'test', value: 'value' });
   });
 
@@ -98,7 +98,7 @@ describe('Alexa REST API scaffold', () => {
       ctx
     );
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = await res.json() as any;
     expect(data.data).toEqual({ text: 'mocked summary' });
   });
 
@@ -112,7 +112,7 @@ describe('Alexa REST API scaffold', () => {
     };
 
     const res = await app.request('/v1/ha/abc/states/light.kitchen', {}, bindings, ctx);
-    const data = await res.json();
+    const data = await res.json() as any;
     expect(data.data.state).toBe('on');
     globalThis.fetch = originalFetch;
   });
@@ -126,7 +126,7 @@ describe('Alexa REST API scaffold', () => {
       ctx
     );
     expect(res.status).toBe(400);
-    let data = await res.json();
+    let data = await res.json() as any;
     expect(data.ok).toBe(false);
     expect(data.error).toBe('Request body must be a JSON object');
 
@@ -138,7 +138,7 @@ describe('Alexa REST API scaffold', () => {
       ctx
     );
     expect(res.status).toBe(400);
-    data = await res.json();
+    data = await res.json() as any;
     expect(data.ok).toBe(false);
     
     // Test with invalid input - null
@@ -149,7 +149,7 @@ describe('Alexa REST API scaffold', () => {
       ctx
     );
     expect(res.status).toBe(400);
-    data = await res.json();
+    data = await res.json() as any;
     expect(data.ok).toBe(false);
   });
 });

@@ -84,5 +84,17 @@ describe('HaWebSocketClient', () => {
     const res = await resultPromise;
     expect((res as { success: boolean }).success).toBe(true);
   });
+
+  it('times out requests when no response is received', async () => {
+    const client = new HaWebSocketClient('http://ha', 'abc');
+    const resultPromise = client.send({ type: 'get_states' }, 100); // 100ms timeout
+    const ws = MockSocket.instances[0];
+    ws.readyState = 1;
+    ws.dispatchEvent(new Event('open'));
+    ws.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'auth_ok' }) }));
+    
+    // Don't send a response - let it timeout
+    await expect(resultPromise).rejects.toThrow('WebSocket request timed out after 100ms');
+  });
 });
 
