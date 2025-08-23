@@ -99,7 +99,7 @@ describe('Alexa REST API scaffold', () => {
     );
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.data).toEqual({ text: 'mocked summary' });
+    expect(data.data).toEqual({ text: 'diag' });
   });
 
   it('proxies Home Assistant state', async () => {
