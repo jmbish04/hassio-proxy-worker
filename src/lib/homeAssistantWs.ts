@@ -29,6 +29,24 @@ interface HaWebSocketResponse extends HaWebSocketMessage {
   };
 }
 
+/**
+ * Home Assistant entity state
+ */
+interface HaEntityState {
+  entity_id: string;
+  state: string;
+  attributes: Record<string, any>;
+  last_changed: string;
+  last_updated: string;
+}
+
+/**
+ * Home Assistant service call result
+ */
+interface HaServiceResult {
+  success: boolean;
+}
+
 interface PendingRequest<T = HaWebSocketResponse> {
   resolve: (value: T) => void;
   reject: (reason?: Error) => void;
@@ -133,8 +151,8 @@ export class HaWebSocketClient {
   }
 
   /** Convenience wrapper for `call_service` commands. */
-  callService(domain: string, service: string, serviceData?: Record<string, any>) {
-    return this.send({
+  callService(domain: string, service: string, serviceData?: Record<string, any>): Promise<HaServiceResult> {
+    return this.send<HaServiceResult>({
       type: 'call_service',
       domain,
       service,
@@ -143,17 +161,17 @@ export class HaWebSocketClient {
   }
 
   /** Convenience wrapper for `get_states` command. */
-  getStates() {
-    return this.send({ type: 'get_states' });
+  getStates(): Promise<{ result: HaEntityState[] }> {
+    return this.send<{ result: HaEntityState[] }>({ type: 'get_states' });
   }
 
   /** Convenience wrapper for `get_services` command. */
-  getServices() {
+  getServices(): Promise<HaWebSocketResponse> {
     return this.send({ type: 'get_services' });
   }
 
   /** Convenience wrapper for `get_config` command. */
-  getConfig() {
+  getConfig(): Promise<HaWebSocketResponse> {
     return this.send({ type: 'get_config' });
   }
 }
