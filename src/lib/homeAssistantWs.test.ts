@@ -82,7 +82,7 @@ describe('HaWebSocketClient', () => {
       new MessageEvent('message', { data: JSON.stringify({ id, type: 'result', success: true }) })
     );
     const res = await resultPromise;
-    expect((res as any).success).toBe(true);
+    expect((res as HaResponseMessage).success).toBe(true);
   });
 });
 
