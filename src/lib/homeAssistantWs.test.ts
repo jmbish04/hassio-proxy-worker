@@ -84,5 +84,44 @@ describe('HaWebSocketClient', () => {
     const res = await resultPromise;
     expect((res as { success: boolean }).success).toBe(true);
   });
+
+  it('rejects pending requests when connection fails', async () => {
+    const client = new HaWebSocketClient('http://ha', 'abc');
+    const resultPromise = client.getStates();
+    const ws = MockSocket.instances[0];
+    ws.readyState = 1;
+    ws.dispatchEvent(new Event('open'));
+    ws.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'auth_ok' }) }));
+    await ws.waitForSent();
+    
+    // At this point, a getStates command has been sent but we haven't received a response
+    expect(ws.sent).toHaveLength(2); // auth + getStates command
+    
+    // Simulate connection failure
+    ws.dispatchEvent(new Event('close'));
+    
+    // The pending request should be rejected
+    await expect(resultPromise).rejects.toThrow('socket closed');
+  });
+
+  it('rejects pending requests when connection errors', async () => {
+    const client = new HaWebSocketClient('http://ha', 'abc');
+    const resultPromise = client.getStates();
+    const ws = MockSocket.instances[0];
+    ws.readyState = 1;
+    ws.dispatchEvent(new Event('open'));
+    ws.dispatchEvent(new MessageEvent('message', { data: JSON.stringify({ type: 'auth_ok' }) }));
+    await ws.waitForSent();
+    
+    // At this point, a getStates command has been sent but we haven't received a response
+    expect(ws.sent).toHaveLength(2); // auth + getStates command
+    
+    // Simulate connection error
+    const errorEvent = new Event('error');
+    ws.dispatchEvent(errorEvent);
+    
+    // The pending request should be rejected
+    await expect(resultPromise).rejects.toEqual(errorEvent);
+  });
 });
 
