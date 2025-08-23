@@ -151,5 +151,6 @@ describe('Alexa REST API scaffold', () => {
     expect(res.status).toBe(400);
     data = await res.json();
     expect(data.ok).toBe(false);
+    expect(data.error).toBe('Request body must be a JSON object');
   });
 });
