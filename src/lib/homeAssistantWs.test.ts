@@ -63,7 +63,7 @@ describe('HaWebSocketClient', () => {
       })
     );
     const res = await resultPromise;
-    expect(res.result[0].entity_id).toBe('light.kitchen');
+    expect((res as { result: [{ entity_id: string }] }).result[0].entity_id).toBe('light.kitchen');
   });
 
   it('sends call_service command', async () => {
@@ -82,7 +82,7 @@ describe('HaWebSocketClient', () => {
       new MessageEvent('message', { data: JSON.stringify({ id, type: 'result', success: true }) })
     );
     const res = await resultPromise;
-    expect(res.success).toBe(true);
+    expect((res as { success: boolean }).success).toBe(true);
   });
 });
 
