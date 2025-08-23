@@ -44,7 +44,8 @@ v1.post('/ai/summary', async (c) => {
     });
     return c.json(ok('ai summary', { text: result.response }));
   } catch (error) {
-    return c.json(ok('ai summary failed', { text: 'Error generating summary', error: String(error) }));
+    console.error('AI summary generation failed:', error);
+    return c.json({ ok: false, error: 'Error generating summary' }, 500);
   }
 });
 
