@@ -9,9 +9,29 @@
 
 import type { Env } from '../index';
 
-interface PendingRequest {
-  resolve: (value: any) => void;
-  reject: (reason?: any) => void;
+/**
+ * Base interface for Home Assistant WebSocket messages
+ */
+interface HaWebSocketMessage {
+  id?: number;
+  type: string;
+}
+
+/**
+ * Home Assistant WebSocket response message
+ */
+interface HaWebSocketResponse extends HaWebSocketMessage {
+  success?: boolean;
+  result?: any;
+  error?: {
+    code: string;
+    message: string;
+  };
+}
+
+interface PendingRequest<T = HaWebSocketResponse> {
+  resolve: (value: T) => void;
+  reject: (reason?: Error) => void;
 }
 
 /**
@@ -22,7 +42,7 @@ interface PendingRequest {
 export class HaWebSocketClient {
   private socket?: WebSocket;
   private nextId = 1;
-  private pending = new Map<number, PendingRequest>();
+  private pending = new Map<number, PendingRequest<any>>();
   private authPromise?: Promise<void>;
 
   constructor(private readonly url: string, private readonly token: string) {}
@@ -48,7 +68,7 @@ export class HaWebSocketClient {
 
       sock.addEventListener('message', (ev) => {
         try {
-          const msg = JSON.parse(ev.data);
+          const msg: HaWebSocketResponse = JSON.parse(ev.data);
           if (msg.type === 'auth_ok') {
             resolve();
             return;
@@ -62,14 +82,15 @@ export class HaWebSocketClient {
         }
       });
 
-      const fail = (err: any) => {
-        reject(err);
+      const fail = (err: Error | Event) => {
+        const error = err instanceof Error ? err : new Error('WebSocket error');
+        reject(error);
         this.socket = undefined;
         this.authPromise = undefined;
 
         // Reject all pending requests to prevent callers from hanging
         for (const p of this.pending.values()) {
-          p.reject(err);
+          p.reject(error);
         }
         this.pending.clear();
       };
@@ -88,7 +109,7 @@ export class HaWebSocketClient {
    *   be added automatically.
    * @returns The parsed response message from Home Assistant.
    */
-  async send<T = any>(command: Record<string, any>): Promise<T> {
+  async send<T = HaWebSocketResponse>(command: Record<string, any>): Promise<T> {
     await this.connect();
     const id = this.nextId++;
     const payload = { ...command, id };
@@ -98,12 +119,15 @@ export class HaWebSocketClient {
         reject(new Error('socket not connected'));
         return;
       }
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, { 
+        resolve: resolve as (value: HaWebSocketResponse) => void, 
+        reject 
+      });
       try {
         this.socket.send(JSON.stringify(payload));
       } catch (err) {
         this.pending.delete(id);
-        reject(err);
+        reject(err instanceof Error ? err : new Error('Failed to send message'));
       }
     });
   }
