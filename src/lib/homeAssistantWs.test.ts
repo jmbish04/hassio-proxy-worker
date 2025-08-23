@@ -63,7 +63,7 @@ describe('HaWebSocketClient', () => {
       })
     );
     const res = await resultPromise;
-    expect((res as any).result[0].entity_id).toBe('light.kitchen');
+    expect(((res as HaResponseMessage).result as any[])[0].entity_id).toBe('light.kitchen');
   });
 
   it('sends call_service command', async () => {
