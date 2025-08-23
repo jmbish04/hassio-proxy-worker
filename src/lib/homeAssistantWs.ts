@@ -10,7 +10,7 @@
 import type { Env } from '../index';
 
 interface PendingRequest {
-  resolve: (value: unknown) => void;
+  resolve: (value: any) => void;
   reject: (reason?: unknown) => void;
 }
 
