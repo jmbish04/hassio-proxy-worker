@@ -7,45 +7,53 @@ vi.mock('ai', () => ({
 import app from './index';
 import type { Env } from './index';
 
-// Simple mocks for bindings with minimal type fixes
+// Improved mocks with better type safety while maintaining compatibility
+const kvMockBase = {
+  store: {} as Record<string, string>,
+  async get(key: string): Promise<string | null> {
+    return (this as any).store[key] || null;
+  },
+  async put(key: string, value: string): Promise<void> {
+    (this as any).store[key] = value;
+  },
+  async delete(key: string): Promise<void> {
+    delete (this as any).store[key];
+  }
+};
+
 const bindings: Env = {
   D1_DB: {
     prepare() {
       return {
         bind() {
-          return { async run() {} };
+          return { async run() { return { success: true }; } };
         }
       };
     }
   } as any,
-  CONFIG_KV: {
-    store: {} as Record<string, string>,
-    async get(key: string) {
-      return (this as any).store[key];
-    },
-    async put(key: string, value: string) {
-      (this as any).store[key] = value;
-    },
-    async delete(key: string) {
-      delete (this as any).store[key];
-    }
-  } as any,
-  SESSIONS_KV: { async get() {}, async put() {}, async delete() {} } as any,
-  CACHE_KV: { async get() {}, async put() {}, async delete() {} } as any,
-  LOGS_BUCKET: { async put() {} } as any,
+  CONFIG_KV: kvMockBase as any,
+  SESSIONS_KV: kvMockBase as any,
+  CACHE_KV: kvMockBase as any,
+  LOGS_BUCKET: { async put() { return {} as any; } } as any,
   AI: { async run() { return { response: 'diag' }; } } as any,
   WEBSOCKET_SERVER: {
     idFromName() {
       return {} as any;
     },
     get() {
-      return { fetch: () => new Response('not implemented', { status: 501 }) } as any;
+      return { 
+        fetch: async () => new Response('not implemented', { status: 501 }) 
+      } as any;
     }
   } as any,
   HASSIO_ENDPOINT_URI: 'https://ha',
   HASSIO_TOKEN: 'token'
 };
-const ctx = { waitUntil() {} } as any;
+
+const ctx = { 
+  waitUntil() {},
+  passThroughOnException() {}
+} as any;
 
 describe('Alexa REST API scaffold', () => {
   it('responds to health check', async () => {
