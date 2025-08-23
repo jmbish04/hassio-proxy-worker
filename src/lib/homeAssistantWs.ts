@@ -11,7 +11,7 @@ import type { Env } from '../index';
 
 interface PendingRequest {
   resolve: (value: any) => void;
-  reject: (reason?: any) => void;
+  reject: (reason?: unknown) => void;
 }
 
 /**
@@ -62,7 +62,7 @@ export class HaWebSocketClient {
         }
       });
 
-      const fail = (err: any) => {
+      const fail = (err: unknown) => {
         reject(err);
         this.socket = undefined;
         this.authPromise = undefined;
@@ -128,7 +128,7 @@ export class HaWebSocketClient {
   }
 
   /** Convenience wrapper for `call_service` commands. */
-  callService(domain: string, service: string, serviceData?: Record<string, any>) {
+  callService(domain: string, service: string, serviceData?: Record<string, unknown>) {
     return this.send({
       type: 'call_service',
       domain,

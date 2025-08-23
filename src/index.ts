@@ -17,7 +17,10 @@ export interface Env {
 const app = new Hono<{ Bindings: Env }>();
 
 app.get('/health', (c) => {
-  return c.json({ ok: true, uptime: (process as any).uptime?.() ?? null, env: { ready: true } });
+  const uptime = typeof process !== 'undefined' && typeof process.uptime === 'function' 
+    ? process.uptime() 
+    : null;
+  return c.json({ ok: true, uptime, env: { ready: true } });
 });
 
 // Minimal docs
