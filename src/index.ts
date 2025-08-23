@@ -9,7 +9,7 @@ export interface Env {
   CACHE_KV: KVNamespace;
   LOGS_BUCKET: R2Bucket;
   AI: Ai;
-  WEBSOCKET_SERVER: DurableObjectNamespace<HomeAssistantWebSocket>;
+  WEBSOCKET_SERVER: DurableObjectNamespace;
   HASSIO_ENDPOINT_URI: string;
   HASSIO_TOKEN: string;
 }

@@ -86,9 +86,10 @@ export class HaWebSocketClient {
    *
    * @param command Partial Home Assistant command object. The `id` field will
    *   be added automatically.
+   * @param timeoutMs Optional timeout in milliseconds (default: 30000)
    * @returns The parsed response message from Home Assistant.
    */
-  async send<T = any>(command: Record<string, any>): Promise<T> {
+  async send<T = any>(command: Record<string, any>, timeoutMs = 30000): Promise<T> {
     await this.connect();
     const id = this.nextId++;
     const payload = { ...command, id };
@@ -98,10 +99,28 @@ export class HaWebSocketClient {
         reject(new Error('socket not connected'));
         return;
       }
-      this.pending.set(id, { resolve, reject });
+
+      // Set up timeout to prevent hanging requests
+      const timeoutId = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`WebSocket request timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.pending.set(id, { 
+        resolve: (value: any) => {
+          clearTimeout(timeoutId);
+          resolve(value);
+        }, 
+        reject: (reason?: any) => {
+          clearTimeout(timeoutId);
+          reject(reason);
+        }
+      });
+
       try {
         this.socket.send(JSON.stringify(payload));
       } catch (err) {
+        clearTimeout(timeoutId);
         this.pending.delete(id);
         reject(err);
       }

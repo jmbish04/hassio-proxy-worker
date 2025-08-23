@@ -2,17 +2,15 @@ import type { Env } from '../index';
 import { getInstanceConfig } from '../lib/homeAssistant';
 
 export class HomeAssistantWebSocket implements DurableObject {
-  private readonly state: DurableObjectState;
   private env: Env;
   private haSocket?: WebSocket;
   private clients = new Set<WebSocket>();
 
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state;
+  constructor(private readonly state: DurableObjectState, env: Env) {
     this.env = env;
   }
 
-  async fetch(request: Request) {
+  async fetch(request: Request): Promise<Response> {
     if (request.headers.get('Upgrade') !== 'websocket') {
       return new Response('Expected websocket', { status: 400 });
     }
@@ -22,11 +20,12 @@ export class HomeAssistantWebSocket implements DurableObject {
     await this.ensureHaSocket(instanceId);
 
     const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair);
+    const client = pair[0];
+    const server = pair[1];
     server.accept();
 
     this.clients.add(server);
-    server.addEventListener('message', (ev) => {
+    server.addEventListener('message', (ev: MessageEvent) => {
       try {
         this.haSocket?.send(ev.data);
       } catch {}
