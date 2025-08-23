@@ -22,7 +22,7 @@ export class HomeAssistantWebSocket implements DurableObject {
     await this.ensureHaSocket(instanceId);
 
     const pair = new WebSocketPair();
-    const [client, server] = Object.values(pair);
+    const { 0: client, 1: server } = pair;
     server.accept();
 
     this.clients.add(server);
