@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('ai', () => ({
+  generateText: async () => ({ text: 'mocked summary' })
+}));
+
 import app from './index';
 
 // Simple mocks for bindings
@@ -82,6 +87,18 @@ describe('Alexa REST API scaffold', () => {
     const res = await app.request('/v1/worker/state/test', {}, bindings, ctx);
     const data = await res.json();
     expect(data.data).toEqual({ key: 'test', value: 'value' });
+  });
+
+  it('generates AI summary', async () => {
+    const res = await app.request(
+      '/v1/ai/summary',
+      { method: 'POST', body: JSON.stringify({ prompt: 'hi' }) },
+      bindings,
+      ctx
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.data).toEqual({ text: 'mocked summary' });
   });
 
   it('proxies Home Assistant state', async () => {

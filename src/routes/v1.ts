@@ -3,6 +3,8 @@ import { ok } from '../lib/response';
 import type { Env } from '../index';
 import { haFetch } from '../lib/homeAssistant';
 import { getHaClient } from '../lib/homeAssistantWs';
+import { createWorkersAI } from 'workers-ai-provider';
+import { generateText } from 'ai';
 
 
 export const v1 = new Hono<{ Bindings: Env }>();
@@ -33,6 +35,16 @@ v1.get('/protect/cameras', async (c) => {
 v1.post('/protect/cameras/:id/snapshot', async (c) => {
   const { id } = c.req.param();
   return c.json(ok(`stub: camera snapshot for ${id}`, { imageUrl: null, camera: id }));
+});
+
+v1.post('/ai/summary', async (c) => {
+  const { prompt } = await c.req.json<{ prompt: string }>();
+  const workersai = createWorkersAI({ binding: c.env.AI });
+  const result = await generateText({
+    model: workersai('@cf/meta/llama-3.1-8b-instruct'),
+    prompt
+  });
+  return c.json(ok('ai summary', { text: result.text }));
 });
 
 v1.post('/webhooks/logs', async (c) => {
