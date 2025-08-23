@@ -23,10 +23,11 @@ export class HomeAssistantWebSocket implements DurableObject {
 
     const pair = new WebSocketPair();
     const { 0: client, 1: server } = pair;
-    server.accept();
+
+    server.accept?.();
 
     this.clients.add(server);
-    server.addEventListener('message', (ev) => {
+    server.addEventListener('message', (ev: any) => {
       try {
         this.haSocket?.send(ev.data);
       } catch {}

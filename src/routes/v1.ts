@@ -41,7 +41,7 @@ v1.post('/ai/summary', async (c) => {
   const { prompt } = await c.req.json<{ prompt: string }>();
   const workersai = createWorkersAI({ binding: c.env.AI });
   const result = await generateText({
-    model: workersai('@cf/meta/llama-3.1-8b-instruct'),
+    model: workersai('@cf/meta/llama-3.1-8b-instruct') as any,
     prompt
   });
   return c.json(ok('ai summary', { text: result.text }));
