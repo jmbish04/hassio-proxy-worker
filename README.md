@@ -6,6 +6,7 @@ This draft sets the foundation for an **Alexa-skill REST API**:
 - `/openapi.json` publishes a placeholder spec for skill-side integration.
 - `wrangler.toml` now points to **dist/index.js** and includes placeholder bindings for **D1**, **KV**, **R2**.
 - TypeScript build pipeline via `tsconfig.json` and `pnpm build`.
+- `/v1/ai/summary` demonstrates Workers AI usage via the Vercel AI SDK.
 
 ## Dev
 ```bash
