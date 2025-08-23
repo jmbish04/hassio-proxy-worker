@@ -5,9 +5,10 @@ vi.mock('ai', () => ({
 }));
 
 import app from './index';
+import type { Env } from './index';
 
-// Simple mocks for bindings
-const bindings = {
+// Simple mocks for bindings with minimal type fixes
+const bindings: Env = {
   D1_DB: {
     prepare() {
       return {
@@ -20,13 +21,13 @@ const bindings = {
   CONFIG_KV: {
     store: {} as Record<string, string>,
     async get(key: string) {
-      return this.store[key];
+      return (this as any).store[key];
     },
     async put(key: string, value: string) {
-      this.store[key] = value;
+      (this as any).store[key] = value;
     },
     async delete(key: string) {
-      delete this.store[key];
+      delete (this as any).store[key];
     }
   } as any,
   SESSIONS_KV: { async get() {}, async put() {}, async delete() {} } as any,
@@ -102,7 +103,7 @@ describe('Alexa REST API scaffold', () => {
   });
 
   it('proxies Home Assistant state', async () => {
-    bindings.CONFIG_KV.store['instance:abc'] = JSON.stringify({ baseUrl: 'https://ha', token: 't' });
+    (bindings.CONFIG_KV as any).store['instance:abc'] = JSON.stringify({ baseUrl: 'https://ha', token: 't' });
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (url: any, init?: any) => {
       expect(url).toBe('https://ha/api/states/light.kitchen');
@@ -114,5 +115,41 @@ describe('Alexa REST API scaffold', () => {
     const data = await res.json();
     expect(data.data.state).toBe('on');
     globalThis.fetch = originalFetch;
+  });
+
+  it('validates WebSocket command is a JSON object', async () => {
+    // Test with invalid input - string instead of object
+    let res = await app.request(
+      '/v1/ha/ws',
+      { method: 'POST', body: JSON.stringify('invalid string') },
+      bindings,
+      ctx
+    );
+    expect(res.status).toBe(400);
+    let data = await res.json();
+    expect(data.ok).toBe(false);
+    expect(data.error).toBe('Request body must be a JSON object');
+
+    // Test with invalid input - array instead of object
+    res = await app.request(
+      '/v1/ha/ws',
+      { method: 'POST', body: JSON.stringify(['invalid', 'array']) },
+      bindings,
+      ctx
+    );
+    expect(res.status).toBe(400);
+    data = await res.json();
+    expect(data.ok).toBe(false);
+    
+    // Test with invalid input - null
+    res = await app.request(
+      '/v1/ha/ws',
+      { method: 'POST', body: JSON.stringify(null) },
+      bindings,
+      ctx
+    );
+    expect(res.status).toBe(400);
+    data = await res.json();
+    expect(data.ok).toBe(false);
   });
 });
