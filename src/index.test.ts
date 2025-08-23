@@ -8,6 +8,8 @@ import app from './index';
 import type { Env } from './index';
 
 // Simple mocks for bindings with minimal type fixes
+const configStore: Record<string, string> = {};
+
 const bindings: Env = {
   D1_DB: {
     prepare() {
@@ -19,15 +21,14 @@ const bindings: Env = {
     }
   } as any,
   CONFIG_KV: {
-    store: {} as Record<string, string>,
     async get(key: string) {
-      return (this as any).store[key];
+      return configStore[key];
     },
     async put(key: string, value: string) {
-      (this as any).store[key] = value;
+      configStore[key] = value;
     },
     async delete(key: string) {
-      delete (this as any).store[key];
+      delete configStore[key];
     }
   } as any,
   SESSIONS_KV: { async get() {}, async put() {}, async delete() {} } as any,
@@ -103,7 +104,7 @@ describe('Alexa REST API scaffold', () => {
   });
 
   it('proxies Home Assistant state', async () => {
-    (bindings.CONFIG_KV as any).store['instance:abc'] = JSON.stringify({ baseUrl: 'https://ha', token: 't' });
+    configStore['instance:abc'] = JSON.stringify({ baseUrl: 'https://ha', token: 't' });
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (url: any, init?: any) => {
       expect(url).toBe('https://ha/api/states/light.kitchen');
@@ -140,6 +141,7 @@ describe('Alexa REST API scaffold', () => {
     expect(res.status).toBe(400);
     data = await res.json();
     expect(data.ok).toBe(false);
+    expect(data.error).toBe('Request body must be a JSON object');
     
     // Test with invalid input - null
     res = await app.request(
@@ -151,5 +153,6 @@ describe('Alexa REST API scaffold', () => {
     expect(res.status).toBe(400);
     data = await res.json();
     expect(data.ok).toBe(false);
+    expect(data.error).toBe('Request body must be a JSON object');
   });
 });
