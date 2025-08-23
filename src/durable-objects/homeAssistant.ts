@@ -26,7 +26,7 @@ export class HomeAssistantWebSocket implements DurableObject {
     server.accept();
 
     this.clients.add(server);
-    server.addEventListener('message', (ev) => {
+    server.addEventListener('message', (ev: MessageEvent) => {
       try {
         this.haSocket?.send(ev.data);
       } catch {}
@@ -37,7 +37,10 @@ export class HomeAssistantWebSocket implements DurableObject {
     server.addEventListener('close', remove);
     server.addEventListener('error', remove);
 
-    return new Response(null, { status: 101, webSocket: client });
+    return new Response(null, { 
+      status: 101, 
+      webSocket: client
+    });
   }
 
   private async ensureHaSocket(instanceId: string) {
