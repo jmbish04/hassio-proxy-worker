@@ -10,6 +10,7 @@ export interface Env {
   LOGS_BUCKET: R2Bucket;
   AI: Ai;
   WEBSOCKET_SERVER: DurableObjectNamespace;
+  ASSETS: Fetcher;
   HASSIO_ENDPOINT_URI: string;
   HASSIO_TOKEN: string;
 }
@@ -23,9 +24,13 @@ app.get('/health', (c) => {
   return c.json({ ok: true, uptime, env: { ready: true } });
 });
 
-// Minimal docs
-app.get('/', (c) => {
-  return c.text('hassio-proxy-worker up. See /openapi.json and /v1/*');
+// Serve main page from static assets
+app.get('/', async (c) => {
+  try {
+    return await c.env.ASSETS.fetch(new Request(new URL('/index.html', c.req.url)));
+  } catch (error) {
+    return c.text('hassio-proxy-worker up. See /openapi.json and /v1/*');
+  }
 });
 
 // OpenAPI placeholder
