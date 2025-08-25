@@ -8,6 +8,7 @@
  */
 
 import type { Env } from '../index';
+import { logger } from './logger';
 
 interface PendingRequest {
   resolve: (value: any) => void;
@@ -38,11 +39,13 @@ export class HaWebSocketClient {
 
     const wsUrl = this.url.replace(/^http/, 'ws') + '/api/websocket';
     this.socket = new WebSocket(wsUrl);
+    logger.debug('Connecting to HA WebSocket', wsUrl);
 
     this.authPromise = new Promise((resolve, reject) => {
       const sock = this.socket!;
 
       sock.addEventListener('open', () => {
+        logger.debug('HA WebSocket open, sending auth');
         sock.send(JSON.stringify({ type: 'auth', access_token: this.token }));
       });
 
@@ -50,10 +53,12 @@ export class HaWebSocketClient {
         try {
           const msg = JSON.parse(ev.data);
           if (msg.type === 'auth_ok') {
+            logger.debug('HA WebSocket authenticated');
             resolve();
             return;
           }
           if (typeof msg.id === 'number' && this.pending.has(msg.id)) {
+            logger.debug('HA WebSocket response', msg.id);
             this.pending.get(msg.id)!.resolve(msg);
             this.pending.delete(msg.id);
           }
@@ -72,6 +77,7 @@ export class HaWebSocketClient {
           p.reject(err);
         }
         this.pending.clear();
+        logger.error('HA WebSocket failure', err);
       };
 
       sock.addEventListener('close', () => fail(new Error('socket closed')));
@@ -92,6 +98,7 @@ export class HaWebSocketClient {
     await this.connect();
     const id = this.nextId++;
     const payload = { ...command, id };
+    logger.debug('HA WebSocket send', payload);
 
     return new Promise<T>((resolve, reject) => {
       if (!this.socket) {
@@ -104,6 +111,7 @@ export class HaWebSocketClient {
       } catch (err) {
         this.pending.delete(id);
         reject(err);
+        logger.error('HA WebSocket send error', err);
       }
     });
   }
