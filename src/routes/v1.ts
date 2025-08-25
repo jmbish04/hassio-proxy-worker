@@ -6,6 +6,8 @@ import { getHaClient } from '../lib/homeAssistantWs';
 import { createWorkersAI } from 'workers-ai-provider';
 import { generateText } from 'ai';
 import { logger } from '../lib/logger';
+import { z } from 'zod';
+import { zodValidator } from '../lib/zodValidator';
 
 
 export const v1 = new Hono<{ Bindings: Env }>();
