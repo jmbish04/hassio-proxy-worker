@@ -6,8 +6,6 @@ import { getHaClient } from '../lib/homeAssistantWs';
 import { createWorkersAI } from 'workers-ai-provider';
 import { generateText } from 'ai';
 import { logger } from '../lib/logger';
-import { z } from 'zod';
-import { zodValidator } from '../lib/zodValidator';
 
 
 export const v1 = new Hono<{ Bindings: Env }>();
@@ -56,48 +54,11 @@ v1.post('/ai/summary', async (c) => {
   logger.debug('ai summary requested', prompt);
   const workersai = createWorkersAI({ binding: c.env.AI });
   const result = await generateText({
-    model: workersai('@cf/meta/llama-3.1-8b-instruct') as any,
+    model: workersai('@cf/openai/gpt-oss-120b') as any,
     prompt
   });
   logger.debug('ai summary response', result.text);
   return c.json(ok('ai summary', { text: result.text }));
-});
-
-
-// Zod schema for AI summary request validation
-const summarySchema = z.object({
-	prompt: z.string().min(10, { message: 'Prompt must be at least 10 characters long.' }),
-});
-
-/**
- * @route {POST} /v1/ai/summary
- * @description Handles requests for AI-powered text summarization.
- * It uses the Cloudflare Workers AI binding and streams the response back to the client.
- * @returns {Promise<Response>} A streaming text response with the AI-generated summary.
- */
-v1.post('/ai/summary', zodValidator('json', summarySchema), async (c) => {
-	const body = c.req.valid('json');
-
-	// Initialize the WorkersAI provider with the correct model
-	const llm = createWorkersAI({
-		env: c.env,
-		model: '@cf/openai/gpt-oss-120b',
-	});
-
-	// Use the modern `streamText` function from the 'ai' SDK
-	const result = await streamText({
-		model: llm,
-		prompt: body.prompt,
-	});
-
-	return result.toTextResponse();
-});
-
-// Zod schema for log webhook validation
-const logSchema = z.object({
-	level: z.enum(['info', 'warn', 'error']),
-	message: z.string(),
-	timestamp: z.string().datetime(),
 });
 
 v1.post('/webhooks/logs', async (c) => {
