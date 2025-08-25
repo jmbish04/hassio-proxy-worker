@@ -1,4 +1,4 @@
-import type { Env } from '../index';
+import type { Env } from '../types';
 
 export interface InstanceConfig {
   baseUrl: string;
