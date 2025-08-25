@@ -80,7 +80,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: body ? JSON.stringify(body) : undefined
         });
-        if (!res.ok) throw new Error('Network response was not ok');
+        if (!res.ok) throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
         const data = await res.json();
         output.textContent = JSON.stringify(data, null, 2);
       } catch (err) {
