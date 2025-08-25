@@ -33,3 +33,7 @@ bucket_name = "hassio-proxy-logs"
 [[durable_objects.bindings]]
 name = "WEBSOCKET_SERVER"
 class_name = "HomeAssistantWebSocket"
+
+[[migrations]]
+tag = "v1"
+new_classes = [ "HomeAssistantWebSocket" ]
