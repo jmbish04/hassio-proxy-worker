@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { v1 } from './routes/v1';
-import type { HomeAssistantWebSocket } from './durable-objects/homeAssistant';
+export { HomeAssistantWebSocket } from './durable-objects/homeAssistant';
 
 export interface Env {
   D1_DB: D1Database;
@@ -9,7 +9,7 @@ export interface Env {
   CACHE_KV: KVNamespace;
   LOGS_BUCKET: R2Bucket;
   AI: Ai;
-  WEBSOCKET_SERVER: DurableObjectNamespace<HomeAssistantWebSocket>;
+  WEBSOCKET_SERVER: DurableObjectNamespace;
   HASSIO_ENDPOINT_URI: string;
   HASSIO_TOKEN: string;
 }
