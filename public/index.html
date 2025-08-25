@@ -56,6 +56,39 @@
   </div>
 
   <script>
+    /**
+     * Converts a duration in seconds to a human-readable string format.
+     * e.g., "1 day, 2 hours, 3 minutes, 4 seconds"
+     * @param {number | null | undefined} totalSeconds - The total seconds to format.
+     * @returns {string} A formatted string representing the duration.
+     */
+    function formatUptime(totalSeconds) {
+      if (totalSeconds === null || typeof totalSeconds === 'undefined') {
+        return 'N/A';
+      }
+
+      totalSeconds = Math.floor(totalSeconds);
+
+      if (totalSeconds < 1) {
+        return 'less than a second';
+      }
+
+      const days = Math.floor(totalSeconds / 86400);
+      totalSeconds %= 86400;
+      const hours = Math.floor(totalSeconds / 3600);
+      totalSeconds %= 3600;
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+
+      const parts = [];
+      if (days > 0) parts.push(`${days} day${days > 1 ? 's' : ''}`);
+      if (hours > 0) parts.push(`${hours} hour${hours > 1 ? 's' : ''}`);
+      if (minutes > 0) parts.push(`${minutes} minute${minutes > 1 ? 's' : ''}`);
+      if (seconds > 0) parts.push(`${seconds} second${seconds > 1 ? 's' : ''}`);
+
+      return parts.join(', ');
+    }
+
     // Fetch and display health information for the worker
     async function fetchHealth() {
       const statusEl = document.getElementById('healthStatus');
@@ -64,7 +97,8 @@
         const res = await fetch('/health');
         if (!res.ok) throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
         const data = await res.json();
-        statusEl.textContent = `Status: ${data.ok ? 'OK' : 'NOT OK'} | Uptime: ${data.uptime}`;
+        const formattedUptime = formatUptime(data.uptime);
+        statusEl.textContent = `Status: ${data.ok ? 'OK' : 'NOT OK'} | Uptime: ${formattedUptime}`;
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
       }
