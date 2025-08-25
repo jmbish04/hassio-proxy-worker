@@ -62,7 +62,7 @@
       statusEl.textContent = 'Loading...';
       try {
         const res = await fetch('/health');
-        if (!res.ok) throw new Error('Network response was not ok');
+        if (!res.ok) throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
         const data = await res.json();
         statusEl.textContent = `Status: ${data.ok ? 'OK' : 'NOT OK'} | Uptime: ${data.uptime}`;
       } catch (err) {
