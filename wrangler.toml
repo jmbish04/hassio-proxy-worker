@@ -1,5 +1,5 @@
-name = "hassio-proxy-worker"
-main = "dist/index.js"
+name = "hassio-proxy"
+main = "src/index.js"
 compatibility_date = "2025-08-01"
 
 [ai]
