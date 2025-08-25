@@ -1,1 +1,114 @@
-tbd
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hassio-Proxy Worker Dashboard</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // Tailwind configuration to use the Inter font
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Inter font -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans">
+  <div class="max-w-3xl mx-auto p-4 space-y-6">
+    <header>
+      <h1 class="text-3xl font-bold text-center">Hassio-Proxy Worker Dashboard</h1>
+    </header>
+
+    <!-- Worker Health Section -->
+    <section class="bg-gray-800 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">Worker Health</h2>
+        <button id="refreshHealth" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded">Refresh</button>
+      </div>
+      <p id="healthStatus" aria-live="polite">Loading...</p>
+    </section>
+
+    <!-- Diagnostics Section -->
+    <section class="bg-gray-800 rounded-lg p-6">
+      <h2 class="text-xl font-semibold mb-4">Run Diagnostics</h2>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <button data-endpoint="/v1/devices/scan" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Scan Devices</button>
+        <button data-endpoint="/v1/protect/sync" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Sync Protect</button>
+        <button data-endpoint="/v1/ai/summary" data-body='{"prompt":"Provide a quick summary of this sample text."}' class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Test AI Summary</button>
+        <button data-endpoint="/v1/webhooks/logs" data-body='' class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Send Test Log</button>
+      </div>
+    </section>
+
+    <!-- Test Results Section -->
+    <section class="bg-gray-800 rounded-lg p-6">
+      <h2 class="text-xl font-semibold mb-4">Test Results</h2>
+      <pre class="bg-gray-900 p-4 rounded overflow-auto"><code id="resultOutput" class="text-sm" aria-live="polite">No test run yet.</code></pre>
+    </section>
+  </div>
+
+  <script>
+    // Fetch and display health information for the worker
+    async function fetchHealth() {
+      const statusEl = document.getElementById('healthStatus');
+      statusEl.textContent = 'Loading...';
+      try {
+        const res = await fetch('/health');
+        if (!res.ok) throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
+        const data = await res.json();
+        statusEl.textContent = `Status: ${data.ok ? 'OK' : 'NOT OK'} | Uptime: ${data.uptime}`;
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    // Run a diagnostic test by posting to a given endpoint
+    async function runDiagnostic(endpoint, body) {
+      const output = document.getElementById('resultOutput');
+      output.textContent = 'Running test...';
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body ? JSON.stringify(body) : undefined
+        });
+        if (!res.ok) throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
+        const data = await res.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (err) {
+        output.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    // Attach event listeners and perform initial health check
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchHealth();
+      document.getElementById('refreshHealth').addEventListener('click', fetchHealth);
+      document.querySelectorAll('[data-endpoint]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          let body = btn.getAttribute('data-body');
+          if (btn.dataset.endpoint === '/v1/webhooks/logs') {
+            // Sample error log data
+            body = {
+              level: 'error',
+              message: 'Test error log from diagnostics dashboard',
+              timestamp: new Date().toISOString()
+            };
+          } else if (body) {
+            body = JSON.parse(body);
+          }
+          runDiagnostic(btn.dataset.endpoint, body);
+        });
+      });
+    });
+  </script>
+</body>
+</html>
