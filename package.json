@@ -1,12 +1,13 @@
 {
-  "name": "hassio-proxy-worker",
+  "name": "hassio-proxy",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "build": "tsc -p tsconfig.json",
-    "deploy": "pnpm build && wrangler deploy",
+    "deploy": "pnpm build && pnpm run migrate:remote && wrangler deploy",
+    "migrate:remote": "wrangler d1 migrations apply D1_DB --remote",
     "test": "vitest run"
   },
   "dependencies": {
