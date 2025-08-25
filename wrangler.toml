@@ -5,6 +5,10 @@ compatibility_date = "2025-08-01"
 [ai]
 binding = "AI"
 
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
 [observability]
 enabled = true
 
