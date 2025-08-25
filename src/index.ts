@@ -8,9 +8,12 @@
  */
 
 import { Hono } from 'hono';
+import { HomeAssistantDurableObject } from './durable-objects/homeAssistant';
 import { logger } from './lib/logger';
 import { v1 } from './routes/v1';
-export { HomeAssistantDurableObject as HomeAssistantWebSocket } from './durable-objects/homeAssistant';
+
+// Export the Durable Object class with the name expected by wrangler.toml
+export { HomeAssistantDurableObject as HomeAssistantWebSocket };
 
 /**
  * @interface Env
