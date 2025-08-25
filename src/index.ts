@@ -96,54 +96,19 @@ app.get('/', async (c) => {
 
 /**
  * @route {GET} /openapi.json
- * @description Serves a placeholder OpenAPI 3.1 specification for the API.
- * This provides a basic contract for the available API endpoints.
- * @returns {Response} JSON response containing the OpenAPI specification.
+ * @description Serves the OpenAPI 3.1 specification from the static assets service.
+ * @returns {Promise<Response>} The JSON file containing the OpenAPI specification.
  */
-app.get('/openapi.json', (c) => {
-	logger.debug('Serving OpenAPI spec');
-	const spec = {
-		openapi: '3.1.0',
-		info: {
-			title: 'Alexa Skill REST API',
-			version: '0.1.0',
-			description:
-				'Minimal Alexa-friendly API. All responses use { ok, speech, card?, data }. Stubbed for draft.',
-		},
-		servers: [{ url: 'https://example.workers.dev' }],
-		paths: {
-			'/v1/devices/scan': {
-				post: {
-					summary: 'Scan LAN and update device inventory (stub)',
-					responses: { '200': { description: 'OK' } },
-				},
-			},
-			'/v1/devices': {
-				get: { summary: 'List devices (stub)', responses: { '200': { description: 'OK' } } },
-			},
-			'/v1/devices/{id}': {
-				get: {
-					summary: 'Get device detail (stub)',
-					parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-					responses: { '200': { description: 'OK' } },
-				},
-			},
-			'/v1/protect/sync': {
-				post: { summary: 'Sync UniFi Protect cameras (stub)', responses: { '200': { description: 'OK' } } },
-			},
-			'/v1/protect/cameras': {
-				get: { summary: 'List cameras (stub)', responses: { '200': { description: 'OK' } } },
-			},
-			'/v1/protect/cameras/{id}/snapshot': {
-				post: {
-					summary: 'Capture snapshot (stub)',
-					parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-					responses: { '200': { description: 'OK' } },
-				},
-			},
-		},
-	};
-	return c.json(spec);
+app.get('/openapi.json', async (c) => {
+	logger.debug('Serving OpenAPI spec from ASSETS');
+	try {
+		// Forward the request to the ASSETS service to fetch the openapi.json file.
+		return await c.env.ASSETS.fetch(new Request(new URL('/openapi.json', c.req.url)));
+	} catch (error) {
+		// Log the error and return a 500 response if the asset cannot be fetched.
+		logger.error('Failed to fetch openapi.json from ASSETS', error);
+		return c.json({ ok: false, error: 'Failed to load OpenAPI specification.' }, 500);
+	}
 });
 
 /**
