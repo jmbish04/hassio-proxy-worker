@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { v1 } from './routes/v1';
+import { logger } from './lib/logger';
 export { HomeAssistantWebSocket } from './durable-objects/homeAssistant';
 
 export interface Env {
@@ -17,24 +18,33 @@ export interface Env {
 
 const app = new Hono<{ Bindings: Env }>();
 
+app.use('*', async (c, next) => {
+  logger.debug('Request:', c.req.method, c.req.path);
+  await next();
+});
+
 app.get('/health', (c) => {
-  const uptime = typeof process !== 'undefined' && typeof process.uptime === 'function' 
-    ? process.uptime() 
+  logger.debug('Handling /health');
+  const uptime = typeof process !== 'undefined' && typeof process.uptime === 'function'
+    ? process.uptime()
     : null;
   return c.json({ ok: true, uptime, env: { ready: true } });
 });
 
 // Serve main page from static assets
 app.get('/', async (c) => {
+  logger.debug('Handling root path');
   try {
     return await c.env.ASSETS.fetch(new Request(new URL('/index.html', c.req.url)));
   } catch (error) {
+    logger.warn('Failed to fetch index.html, returning default text');
     return c.text('hassio-proxy-worker up. See /openapi.json and /v1/*');
   }
 });
 
 // OpenAPI placeholder
 app.get('/openapi.json', (c) => {
+  logger.debug('Serving OpenAPI spec');
   const spec = {
     openapi: '3.1.0',
     info: {
@@ -84,6 +94,7 @@ app.route('/v1', v1);
 
 app.get('/ws/:instanceId', (c) => {
   const { instanceId } = c.req.param();
+  logger.debug('Proxying WebSocket for instance', instanceId);
   const id = c.env.WEBSOCKET_SERVER.idFromName(instanceId);
   const stub = c.env.WEBSOCKET_SERVER.get(id);
   return stub.fetch(c.req.raw);
