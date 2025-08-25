@@ -1,0 +1,95 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Alexa Skill REST API",
+    "version": "0.1.0",
+    "description": "Minimal Alexa-friendly API. All responses use { ok, speech, card?, data }. Stubbed for draft."
+  },
+  "servers": [
+    {
+      "url": "https://example.workers.dev"
+    }
+  ],
+  "paths": {
+    "/v1/devices/scan": {
+      "post": {
+        "summary": "Scan LAN and update device inventory (stub)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/devices": {
+      "get": {
+        "summary": "List devices (stub)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/devices/{id}": {
+      "get": {
+        "summary": "Get device detail (stub)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/protect/sync": {
+      "post": {
+        "summary": "Sync UniFi Protect cameras (stub)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/protect/cameras": {
+      "get": {
+        "summary": "List cameras (stub)",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/v1/protect/cameras/{id}/snapshot": {
+      "post": {
+        "summary": "Capture snapshot (stub)",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  }
+}
