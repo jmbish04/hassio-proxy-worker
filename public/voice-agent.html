@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Agent</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans p-4">
+  <h1 class="text-2xl font-bold mb-4">Real-time Voice Agent</h1>
+  <p class="mb-4">Press the button and speak a question. Release to send.</p>
+  <button id="record" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Start Recording</button>
+  <div id="transcript" class="mt-4 whitespace-pre-wrap"></div>
+  <script>
+    let mediaRecorder;
+    let chunks = [];
+    const button = document.getElementById('record');
+    const transcriptEl = document.getElementById('transcript');
+    let recording = false;
+
+    async function startRecording() {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaRecorder = new MediaRecorder(stream);
+      chunks = [];
+      mediaRecorder.ondataavailable = e => chunks.push(e.data);
+      mediaRecorder.start();
+      recording = true;
+      button.textContent = 'Stop Recording';
+    }
+
+    async function stopRecording() {
+      return new Promise(resolve => {
+        mediaRecorder.onstop = resolve;
+        mediaRecorder.stop();
+      });
+    }
+
+    async function sendAudio() {
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      const arrayBuffer = await blob.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const res = await fetch('/v1/ai/voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ audio: base64 })
+      });
+      const data = await res.json();
+      transcriptEl.textContent = `You said: ${data.data.transcript}\nAgent: ${data.data.reply}`;
+      if (data.data.audio) {
+        const audio = new Audio('data:audio/wav;base64,' + data.data.audio);
+        audio.play();
+      }
+    }
+
+    button.addEventListener('click', async () => {
+      if (!recording) {
+        await startRecording();
+      } else {
+        await stopRecording();
+        recording = false;
+        button.textContent = 'Start Recording';
+        await sendAudio();
+      }
+    });
+  </script>
+</body>
+</html>
