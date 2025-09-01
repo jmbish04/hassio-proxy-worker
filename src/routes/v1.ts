@@ -66,10 +66,7 @@ v1.post('/ai/voice', async (c) => {
   logger.debug('voice agent request');
 
   const binaryString = atob(audioBase64);
-  const audio = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    audio[i] = binaryString.charCodeAt(i);
-  }
+  const audio = Uint8Array.from(binaryString, c => c.charCodeAt(0));
 
   // Speech to text
   const sttRes: { text?: string } = await c.env.AI.run('@cf/openai/whisper', {
