@@ -65,16 +65,7 @@ v1.post('/ai/voice', async (c) => {
   const { audio: audioBase64 } = await c.req.json<{ audio: string }>();
   logger.debug('voice agent request');
 
-  const decodeBase64 = (str: string) =>
-    typeof atob === 'function'
-      ? atob(str)
-      : Buffer.from(str, 'base64').toString('binary');
-
-  const binaryString = decodeBase64(audioBase64);
-  const audio = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    audio[i] = binaryString.charCodeAt(i);
-  }
+  const audio = Buffer.from(audioBase64, 'base64');
 
   // Speech to text
   const sttRes: { text?: string } = await c.env.AI.run('@cf/openai/whisper', {
