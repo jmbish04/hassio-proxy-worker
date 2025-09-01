@@ -62,11 +62,13 @@ v1.post('/ai/summary', async (c) => {
 });
 
 v1.post('/ai/voice', async (c) => {
-  const { audio } = await c.req.json<{ audio: string }>();
+  const { audio: audioBase64 } = await c.req.json<{ audio: string }>();
   logger.debug('voice agent request');
 
+  const audio = Buffer.from(audioBase64, 'base64');
+
   // Speech to text
-  const sttRes: any = await c.env.AI.run('@cf/openai/whisper', {
+  const sttRes: { text?: string } = await c.env.AI.run('@cf/openai/whisper', {
     audio
   });
   const transcript: string = sttRes.text || '';
@@ -90,7 +92,7 @@ v1.post('/ai/voice', async (c) => {
   }
 
   // Text to speech
-  const ttsRes: any = await c.env.AI.run('@cf/openai/gpt-4o-mini-tts', {
+  const ttsRes: { audio_base64?: string } = await c.env.AI.run('@cf/openai/gpt-4o-mini-tts', {
     text: reply,
     voice: 'alloy'
   });
