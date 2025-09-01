@@ -45,10 +45,10 @@
       transcriptEl.textContent = 'Processing...';
       try {
         const blob = new Blob(chunks, { type: 'audio/webm' });
-        const base64: string = await new Promise((resolve, reject) => {
+        const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(blob);
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          reader.onloadend = () => resolve(String(reader.result).split(',')[1]);
           reader.onerror = reject;
         });
         const res = await fetch('/v1/ai/voice', {
