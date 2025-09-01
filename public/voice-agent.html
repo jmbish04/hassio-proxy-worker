@@ -9,6 +9,7 @@
 <body class="bg-gray-900 text-gray-100 font-sans p-4">
   <h1 class="text-2xl font-bold mb-4">Real-time Voice Agent</h1>
   <p class="mb-4">Press and hold the button and speak a question. Release to send.</p>
+
   <button id="record" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Hold to Record</button>
   <div id="transcript" class="mt-4 whitespace-pre-wrap"></div>
   <script>
@@ -48,7 +49,8 @@
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.readAsDataURL(blob);
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          // Merged and resolved code block
+          reader.onloadend = () => resolve(String(reader.result).split(',')[1]);
           reader.onerror = reject;
         });
         const res = await fetch('/v1/ai/voice', {
@@ -73,11 +75,11 @@
       }
     }
 
-    button.addEventListener('mousedown', async () => {
-      if (recording) return;
-      await startRecording();
-    });
-
+// Merged and resolved code block
+button.addEventListener('mousedown', async () => {
+  if (recording) return;
+  await startRecording();
+});
     button.addEventListener('mouseup', async () => {
       if (!recording) return;
       await stopRecording();

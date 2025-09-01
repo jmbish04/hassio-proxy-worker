@@ -113,20 +113,20 @@ describe('Alexa REST API scaffold', () => {
     const data = await res.json();
     expect(data.data).toEqual({ text: 'mocked summary' });
   });
-
-  it('handles voice interaction', async () => {
-    const fakeAudio = Buffer.from('abc').toString('base64');
-    const res = await app.request(
-      '/v1/ai/voice',
-      { method: 'POST', body: JSON.stringify({ audio: fakeAudio }) },
-      bindings,
-      ctx
-    );
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.data.transcript).toBe('hello');
-    expect(data.data.audio).toBe('fakeaudio');
-  });
+// Merged and resolved code block
+it('handles voice interaction', async () => {
+  const audioBase64 = Buffer.from('abc').toString('base64');
+  const res = await app.request(
+    '/v1/ai/voice',
+    { method: 'POST', body: JSON.stringify({ audio: audioBase64 }) },
+    bindings,
+    ctx
+  );
+  expect(res.status).toBe(200);
+  const data = await res.json();
+  expect(data.data.transcript).toBe('hello');
+  expect(data.data.audio).toBe('fakeaudio');
+});
 
   it('proxies Home Assistant state', async () => {
     (bindings.CONFIG_KV as any).store['instance:abc'] = JSON.stringify({ baseUrl: 'https://ha', token: 't' });
