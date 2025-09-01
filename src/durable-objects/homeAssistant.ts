@@ -1,5 +1,6 @@
 import type { Env } from '../types';
 import { getInstanceConfig } from '../lib/homeAssistant';
+import { logger } from '../lib/logger';
 
 export class HomeAssistantWebSocket implements DurableObject {
   private readonly state: DurableObjectState;
@@ -14,11 +15,13 @@ export class HomeAssistantWebSocket implements DurableObject {
 
   async fetch(request: Request) {
     if (request.headers.get('Upgrade') !== 'websocket') {
+      logger.warn('Non-websocket request to HomeAssistantWebSocket');
       return new Response('Expected websocket', { status: 400 });
     }
 
     const url = new URL(request.url);
     const instanceId = url.pathname.split('/').pop() || 'default';
+    logger.debug('HomeAssistantWebSocket fetch for', instanceId);
     await this.ensureHaSocket(instanceId);
 
     const pair = new WebSocketPair();
@@ -47,10 +50,14 @@ export class HomeAssistantWebSocket implements DurableObject {
     const config = this.env.HASSIO_ENDPOINT_URI && this.env.HASSIO_TOKEN
       ? { baseUrl: this.env.HASSIO_ENDPOINT_URI, token: this.env.HASSIO_TOKEN }
       : await getInstanceConfig(this.env, instanceId);
-    if (!config) return;
+    if (!config) {
+      logger.warn('No HA config found for instance', instanceId);
+      return;
+    }
 
     const wsUrl = config.baseUrl.replace(/^http/, 'ws') + '/api/websocket';
     this.haSocket = new WebSocket(wsUrl);
+    logger.debug('Opening HA socket', wsUrl);
     this.haSocket.addEventListener('open', () => {
       this.haSocket!.send(
         JSON.stringify({ type: 'auth', access_token: config.token })
@@ -64,9 +71,11 @@ export class HomeAssistantWebSocket implements DurableObject {
       }
     });
     this.haSocket.addEventListener('close', () => {
+      logger.warn('HA socket closed');
       this.haSocket = undefined;
     });
     this.haSocket.addEventListener('error', () => {
+      logger.error('HA socket error');
       this.haSocket = undefined;
     });
   }

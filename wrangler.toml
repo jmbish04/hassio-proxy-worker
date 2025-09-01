@@ -5,6 +5,10 @@ compatibility_date = "2025-08-01"
 [ai]
 binding = "AI"
 
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
 [observability]
 enabled = true
 
@@ -33,3 +37,7 @@ bucket_name = "hassio-proxy-logs"
 [[durable_objects.bindings]]
 name = "WEBSOCKET_SERVER"
 class_name = "HomeAssistantWebSocket"
+
+[[migrations]]
+tag = "v1"
+new_classes = [ "HomeAssistantWebSocket" ]
