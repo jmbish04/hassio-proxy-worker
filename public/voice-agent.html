@@ -19,13 +19,18 @@
     let recording = false;
 
     async function startRecording() {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      chunks = [];
-      mediaRecorder.ondataavailable = e => chunks.push(e.data);
-      mediaRecorder.start();
-      recording = true;
-      button.textContent = 'Stop Recording';
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        chunks = [];
+        mediaRecorder.ondataavailable = e => chunks.push(e.data);
+        mediaRecorder.start();
+        recording = true;
+        button.textContent = 'Stop Recording';
+      } catch (err) {
+        console.error('Error starting recording:', err);
+        transcriptEl.textContent = 'Could not start recording. Please grant microphone permission.';
+      }
     }
 
     async function stopRecording() {
