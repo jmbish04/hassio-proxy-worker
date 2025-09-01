@@ -7,11 +7,11 @@
  * `env.HASSIO_ENDPOINT_URI`.
  */
 
-import type { Env } from '../index';
+import type { WorkerEnv } from '../index';
 import { logger } from './logger';
 
-interface PendingRequest {
-  resolve: (value: any) => void;
+interface PendingRequest<T = unknown> {
+  resolve: (value: T) => void;
   reject: (reason?: unknown) => void;
 }
 
@@ -23,7 +23,7 @@ interface PendingRequest {
 export class HaWebSocketClient {
   private socket?: WebSocket;
   private nextId = 1;
-  private pending = new Map<number, PendingRequest>();
+  private pending = new Map<number, PendingRequest<unknown>>();
   private authPromise?: Promise<void>;
 
   constructor(private readonly url: string, private readonly token: string) {}
@@ -37,12 +37,16 @@ export class HaWebSocketClient {
       return this.authPromise;
     }
 
-    const wsUrl = this.url.replace(/^http/, 'ws') + '/api/websocket';
+    const wsUrl = `${this.url.replace(/^http/, 'ws')}/api/websocket`;
     this.socket = new WebSocket(wsUrl);
     logger.debug('Connecting to HA WebSocket', wsUrl);
 
     this.authPromise = new Promise((resolve, reject) => {
-      const sock = this.socket!;
+      const sock = this.socket;
+      if (!sock) {
+        reject(new Error('WebSocket not initialized'));
+        return;
+      }
 
       sock.addEventListener('open', () => {
         logger.debug('HA WebSocket open, sending auth');
@@ -59,10 +63,13 @@ export class HaWebSocketClient {
           }
           if (typeof msg.id === 'number' && this.pending.has(msg.id)) {
             logger.debug('HA WebSocket response', msg.id);
-            this.pending.get(msg.id)!.resolve(msg);
-            this.pending.delete(msg.id);
+            const pendingRequest = this.pending.get(msg.id);
+            if (pendingRequest) {
+              pendingRequest.resolve(msg);
+              this.pending.delete(msg.id);
+            }
           }
-        } catch (err) {
+        } catch {
           // ignore malformed messages
         }
       });
@@ -105,7 +112,10 @@ export class HaWebSocketClient {
         reject(new Error('socket not connected'));
         return;
       }
-      this.pending.set(id, { resolve, reject });
+      this.pending.set(id, {
+        resolve: resolve as (value: unknown) => void,
+        reject
+      });
       try {
         this.socket.send(JSON.stringify(payload));
       } catch (err) {
@@ -140,6 +150,28 @@ export class HaWebSocketClient {
   getConfig() {
     return this.send({ type: 'get_config' });
   }
+
+  /** Subscribe to Home Assistant events */
+  subscribeEvents(eventType?: string) {
+    const command: Record<string, unknown> = { type: 'subscribe_events' };
+    if (eventType) {
+      command.event_type = eventType;
+    }
+    return this.send(command);
+  }
+
+  /** Get Home Assistant logs */
+  async getLogs() {
+    return this.send({ type: 'get_logs' });
+  }
+
+  /** Get error logs specifically */
+  async getErrorLogs() {
+    return this.send({
+      type: 'get_logs',
+      level: 'ERROR'
+    });
+  }
 }
 
 let client: HaWebSocketClient | undefined;
@@ -148,10 +180,9 @@ let client: HaWebSocketClient | undefined;
  * Returns a singleton `HaWebSocketClient` instance configured from environment
  * bindings. Subsequent calls reuse the existing connection.
  */
-export function getHaClient(env: Env): HaWebSocketClient {
+export function getHaClient(env: WorkerEnv): HaWebSocketClient {
   if (!client) {
     client = new HaWebSocketClient(env.HASSIO_ENDPOINT_URI, env.HASSIO_TOKEN);
   }
   return client;
 }
-

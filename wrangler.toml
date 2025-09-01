@@ -2,6 +2,20 @@ name = "hassio-proxy"
 main = "src/index.ts"
 compatibility_date = "2025-08-01"
 
+[vars]
+DEFAULT_TEXT_MODEL = "@cf/openai/gpt-oss-120b"
+DEFAULT_OBJECT_MODEL = "@cf/facebook/detr-resnet-50"
+DEFAULT_FACE_MODEL = "@cf/microsoft/resnet-50"
+DEFAULT_VISION_MODEL = "@cf/llava-hf/llava-1.5-7b-hf"
+# Home Assistant Configuration - These are setup as secrets
+## HASSIO_ENDPOINT_URI - Your Home Assistant URL (e.g., "http://homeassistant.local:8123")
+## HASSIO_TOKEN - Your long-lived access token from Home Assistant
+# All UniFi Protect integration happens through Home Assistant APIs
+
+# CRON triggers for automated brain processing
+[triggers]
+crons = [ "0 9 * * 1" ] # Weekly brain sweep: Every Monday at 09:00 UTC
+
 [ai]
 binding = "AI"
 

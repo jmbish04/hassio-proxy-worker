@@ -1,15 +1,13 @@
-import type { Env } from '../index';
+import type { WorkerEnv } from '../index';
 import { getInstanceConfig } from '../lib/homeAssistant';
 import { logger } from '../lib/logger';
 
 export class HomeAssistantWebSocket implements DurableObject {
-  private readonly state: DurableObjectState;
-  private env: Env;
+  private env: WorkerEnv;
   private haSocket?: WebSocket;
   private clients = new Set<WebSocket>();
 
-  constructor(state: DurableObjectState, env: Env) {
-    this.state = state;
+  constructor(env: WorkerEnv) {
     this.env = env;
   }
 
@@ -30,7 +28,7 @@ export class HomeAssistantWebSocket implements DurableObject {
     server.accept?.();
 
     this.clients.add(server);
-    server.addEventListener('message', (ev: any) => {
+    server.addEventListener('message', (ev: MessageEvent) => {
       try {
         this.haSocket?.send(ev.data);
       } catch {}
@@ -55,13 +53,15 @@ export class HomeAssistantWebSocket implements DurableObject {
       return;
     }
 
-    const wsUrl = config.baseUrl.replace(/^http/, 'ws') + '/api/websocket';
+    const wsUrl = `${config.baseUrl.replace(/^http/, 'ws')}/api/websocket`;
     this.haSocket = new WebSocket(wsUrl);
     logger.debug('Opening HA socket', wsUrl);
     this.haSocket.addEventListener('open', () => {
-      this.haSocket!.send(
-        JSON.stringify({ type: 'auth', access_token: config.token })
-      );
+      if (this.haSocket) {
+        this.haSocket.send(
+          JSON.stringify({ type: 'auth', access_token: config.token })
+        );
+      }
     });
     this.haSocket.addEventListener('message', (ev) => {
       for (const client of this.clients) {

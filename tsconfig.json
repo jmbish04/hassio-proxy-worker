@@ -9,9 +9,18 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "lib": ["ES2022", "DOM"],
-    "types": ["@cloudflare/workers-types", "node"]
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "./worker-configuration"
+    ]
   },
-  "include": ["src/**/*"],
-  "exclude": ["src/**/*.test.ts"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/**/*.test.ts"
+  ]
 }
