@@ -1,4 +1,4 @@
-import type { WorkerEnv } from '../index';
+import type { Env } from '../types';
 import { logger } from './logger';
 
 export interface InstanceConfig {
@@ -6,7 +6,7 @@ export interface InstanceConfig {
   token: string;
 }
 
-export async function getInstanceConfig(env: WorkerEnv, instanceId: string): Promise<InstanceConfig | null> {
+export async function getInstanceConfig(env: Env, instanceId: string): Promise<InstanceConfig | null> {
   const raw = await env.CONFIG_KV.get(`instance:${instanceId}`);
   if (raw) {
     logger.debug('Instance config loaded', instanceId);
@@ -16,7 +16,7 @@ export async function getInstanceConfig(env: WorkerEnv, instanceId: string): Pro
   return raw ? JSON.parse(raw) : null;
 }
 
-export async function haFetch(env: WorkerEnv, instanceId: string, path: string, init: RequestInit = {}): Promise<Response> {
+export async function haFetch(env: Env, instanceId: string, path: string, init: RequestInit = {}): Promise<Response> {
   const config = await getInstanceConfig(env, instanceId);
   if (!config) {
     logger.error('Instance not configured', instanceId);

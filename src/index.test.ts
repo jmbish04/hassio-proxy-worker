@@ -4,11 +4,17 @@ vi.mock("ai", () => ({
 	generateText: async () => ({ text: "mocked summary" }),
 }));
 
-import type { WorkerEnv } from "./index";
-import worker from "./index";
+vi.mock('./lib/homeAssistantWs', () => ({
+  getHaClient: () => ({
+    getStates: async () => []
+  })
+}));
+
+import app from './index';
+import type { Env } from './types';
 
 // Simple mocks for bindings with minimal type fixes
-const bindings: WorkerEnv = {
+const bindings: Env = {
 	D1_DB: {
 		prepare() {
 			return {
@@ -34,9 +40,11 @@ const bindings: WorkerEnv = {
 	CACHE_KV: { async get() {}, async put() {}, async delete() {} } as any,
 	LOGS_BUCKET: { async put() {} } as any,
 	AI: {
-		async run() {
-			return { response: "mocked summary" };
-		},
+		async run(model: string) {
+      if (model.includes('whisper')) return { text: 'hello' } as any;
+      if (model.includes('gpt-4o-mini-tts')) return { audio_base64: 'fakeaudio' } as any;
+      return { response: 'diag' } as any;
+    }
 	} as any,
 	WEBSOCKET_SERVER: {
 		idFromName() {
@@ -64,7 +72,7 @@ const ctx = { waitUntil() {} } as any;
 
 describe("Alexa REST API scaffold", () => {
 	it("responds to health check", async () => {
-		const res = await worker.fetch(new Request("http://localhost/health"), bindings, ctx);
+		const res = await app.request("http://localhost/health", bindings, ctx);
 		expect(res.status).toBe(200);
 		const data = await res.json();
 		expect(data.ok).toBe(true);
@@ -95,7 +103,7 @@ describe("Alexa REST API scaffold", () => {
 			return new Response('Not found', { status: 404 });
 		});
 
-		const res = await worker.fetch(
+		const res = await app.request(
 			new Request("http://localhost/v1/devices/scan", { method: "POST" }),
 			bindings,
 			ctx,
@@ -117,7 +125,7 @@ describe("Alexa REST API scaffold", () => {
 	});
 
 	it("accepts log webhook", async () => {
-		const res = await worker.fetch(
+		const res = await app.request(
 			new Request("http://localhost/v1/webhooks/logs", {
 				method: "POST",
 				body: JSON.stringify({ level: "ERROR", message: "fail" }),
@@ -132,17 +140,30 @@ describe("Alexa REST API scaffold", () => {
 	});
 
 	it("stores and retrieves worker state", async () => {
-		const putRes = await worker.fetch(
+		const putRes = await app.request(
 			new Request("http://localhost/v1/worker/state/test", { method: "PUT", body: "value" }),
 			bindings,
 			ctx,
 		);
 		expect(putRes.status).toBe(200);
 
-		const res = await worker.fetch(new Request("http://localhost/v1/worker/state/test"), bindings, ctx);
+		const res = await app.request(new Request("http://localhost/v1/worker/state/test"), bindings, ctx);
 		const data = await res.json();
 		expect(data.data).toEqual({ key: "test", value: "value" });
 	});
+
+  it('handles voice interaction', async () => {
+    const res = await app.request(
+      '/v1/ai/voice',
+      { method: 'POST', body: JSON.stringify({ audio: 'abc' }) },
+      bindings,
+      ctx
+    );
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.data.transcript).toBe('hello');
+    expect(data.data.audio).toBe('fakeaudio');
+  });
 
 	it("generates AI summary", async () => {
 		const originalFetch = globalThis.fetch;
@@ -164,7 +185,7 @@ describe("Alexa REST API scaffold", () => {
 			return new Response('Not found', { status: 404 });
 		});
 
-		const res = await worker.fetch(
+		const res = await app.request(
 			new Request("http://localhost/v1/ai/summary", { method: "POST" }),
 			bindings,
 			ctx,
@@ -198,7 +219,7 @@ describe("Alexa REST API scaffold", () => {
 			return new Response(JSON.stringify({ state: "on" }), { status: 200 });
 		};
 
-		const res = await worker.fetch(
+		const res = await app.request(
 			new Request("http://localhost/v1/ha/abc/states/light.kitchen"),
 			bindings,
 			ctx,
@@ -210,7 +231,7 @@ describe("Alexa REST API scaffold", () => {
 
 	it("validates WebSocket command is a JSON object", async () => {
 		// Test with invalid input - string instead of object
-		let res = await worker.fetch(
+		let res = await app.request(
 			new Request("http://localhost/v1/ha/ws", {
 				method: "POST",
 				body: JSON.stringify("invalid string")
@@ -224,7 +245,7 @@ describe("Alexa REST API scaffold", () => {
 		expect(data.error).toBe("Request body must be a JSON object");
 
 		// Test with invalid input - array instead of object
-		res = await worker.fetch(
+		res = await app.request(
 			new Request("http://localhost/v1/ha/ws", {
 				method: "POST",
 				body: JSON.stringify(["invalid", "array"])
@@ -237,7 +258,7 @@ describe("Alexa REST API scaffold", () => {
 		expect(data.ok).toBe(false);
 
 		// Test with invalid input - null
-		res = await worker.fetch(
+		res = await app.request(
 			new Request("http://localhost/v1/ha/ws", {
 				method: "POST",
 				body: JSON.stringify(null)

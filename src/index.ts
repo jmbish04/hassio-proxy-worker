@@ -7,41 +7,15 @@
  * @module src/index
  */
 
-import { Hono } from "hono";
+import { Hono } from 'hono';
+import { v1 } from './routes/v1';
+import type { Env } from './types';
+import { logger } from './lib/logger';
 import { brainSweep } from "./lib/brain";
 import { HaWebSocketClient } from "./lib/homeAssistantWs";
-import { logger } from "./lib/logger";
-import { v1 } from "./routes/v1";
 
 // Export the Durable Object class with the name expected by wrangler.toml
 export { HomeAssistantWebSocket } from "./durable-objects/homeAssistant";
-
-/**
- * @interface WorkerEnv
- * @description Extends the generated Env interface with additional environment variables
- * specific to this worker.
- * @property {string} HASSIO_ENDPOINT_URI - The endpoint URI for the Home Assistant instance.
- * @property {string} HASSIO_TOKEN - The long-lived access token for Home Assistant.
- * @property {string} DEFAULT_TEXT_MODEL - The default AI model for text generation.
- * @property {string} DEFAULT_OBJECT_MODEL - The default AI model for object detection.
- * @property {string} DEFAULT_FACE_MODEL - The default AI model for face detection.
- * @property {string} DEFAULT_VISION_MODEL - The default AI model for vision analysis.
- */
-export interface WorkerEnv
-	extends Omit<
-		Env,
-		| "DEFAULT_TEXT_MODEL"
-		| "DEFAULT_OBJECT_MODEL"
-		| "DEFAULT_FACE_MODEL"
-		| "DEFAULT_VISION_MODEL"
-	> {
-	HASSIO_ENDPOINT_URI: string;
-	HASSIO_TOKEN: string;
-	DEFAULT_TEXT_MODEL: string;
-	DEFAULT_OBJECT_MODEL: string;
-	DEFAULT_FACE_MODEL: string;
-	DEFAULT_VISION_MODEL: string;
-}
 
 /**
  * @constant {number} startTime
@@ -55,7 +29,7 @@ const startTime = Date.now();
  * @description An instance of the Hono web framework, typed with the Worker's environment bindings.
  * This object is used to define routes and middleware for the application.
  */
-const app = new Hono<{ Bindings: WorkerEnv }>();
+const app = new Hono<{ Bindings: Env }>();
 
 /**
  * @middleware
@@ -248,7 +222,7 @@ app.get("/ws/:instanceId", (c) => {
 export default {
 	async fetch(
 		request: Request,
-		env: WorkerEnv,
+		env: Env,
 		ctx: ExecutionContext,
 	): Promise<Response> {
 		return app.fetch(request, env, ctx);
@@ -256,7 +230,7 @@ export default {
 
 	async scheduled(
 		controller: ScheduledController,
-		env: WorkerEnv,
+		env: Env,
 		ctx: ExecutionContext,
 	): Promise<void> {
 		logger.info("🧠 Scheduled brain sweep triggered", {

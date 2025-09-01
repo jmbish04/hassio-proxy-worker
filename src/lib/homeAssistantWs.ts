@@ -1,13 +1,4 @@
-/**
- * Home Assistant WebSocket client for Cloudflare Workers.
- *
- * This client wraps the Home Assistant WebSocket API allowing any supported
- * command to be issued and responses awaited. It authenticates using
- * `env.HASSIO_TOKEN` and connects to the instance configured by
- * `env.HASSIO_ENDPOINT_URI`.
- */
-
-import type { WorkerEnv } from '../index';
+import type { Env } from '../types';
 import { logger } from './logger';
 
 interface PendingRequest<T = unknown> {
@@ -180,7 +171,7 @@ let client: HaWebSocketClient | undefined;
  * Returns a singleton `HaWebSocketClient` instance configured from environment
  * bindings. Subsequent calls reuse the existing connection.
  */
-export function getHaClient(env: WorkerEnv): HaWebSocketClient {
+export function getHaClient(env: Env): HaWebSocketClient {
   if (!client) {
     client = new HaWebSocketClient(env.HASSIO_ENDPOINT_URI, env.HASSIO_TOKEN);
   }
