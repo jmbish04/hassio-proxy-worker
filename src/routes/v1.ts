@@ -61,6 +61,43 @@ v1.post('/ai/summary', async (c) => {
   return c.json(ok('ai summary', { text: result.text }));
 });
 
+v1.post('/ai/voice', async (c) => {
+  const { audio } = await c.req.json<{ audio: string }>();
+  logger.debug('voice agent request');
+
+  // Speech to text
+  const sttRes: any = await c.env.AI.run('@cf/openai/whisper', {
+    audio
+  });
+  const transcript: string = sttRes.text || '';
+
+  let reply = '';
+  if (/status/i.test(transcript)) {
+    try {
+      const states: any[] = await getHaClient(c.env).getStates();
+      reply = `There are ${states?.length ?? 0} entities reported by Home Assistant.`;
+    } catch (err) {
+      logger.error('HA status error', err);
+      reply = 'Unable to retrieve Home Assistant status.';
+    }
+  } else {
+    const workersai = createWorkersAI({ binding: c.env.AI });
+    const result = await generateText({
+      model: workersai('@cf/openai/gpt-oss-120b') as any,
+      prompt: transcript
+    });
+    reply = result.text;
+  }
+
+  // Text to speech
+  const ttsRes: any = await c.env.AI.run('@cf/openai/gpt-4o-mini-tts', {
+    text: reply,
+    voice: 'alloy'
+  });
+
+  return c.json(ok('voice', { transcript, reply, audio: ttsRes.audio_base64 }));
+});
+
 v1.post('/webhooks/logs', async (c) => {
   const log = await c.req.json();
   const key = `logs/${Date.now()}-${crypto.randomUUID()}.json`;
