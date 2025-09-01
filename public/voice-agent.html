@@ -8,8 +8,8 @@
 </head>
 <body class="bg-gray-900 text-gray-100 font-sans p-4">
   <h1 class="text-2xl font-bold mb-4">Real-time Voice Agent</h1>
-  <p class="mb-4">Press the button and speak a question. Release to send.</p>
-  <button id="record" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Start Recording</button>
+  <p class="mb-4">Press and hold the button to speak. Release to send.</p>
+  <button id="record" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Hold to Record</button>
   <div id="transcript" class="mt-4 whitespace-pre-wrap"></div>
   <script>
     let mediaRecorder;
@@ -26,7 +26,7 @@
         mediaRecorder.ondataavailable = e => chunks.push(e.data);
         mediaRecorder.start();
         recording = true;
-        button.textContent = 'Stop Recording';
+        button.textContent = 'Release to Send';
       } catch (err) {
         console.error('Error starting recording:', err);
         transcriptEl.textContent = 'Could not start recording. Please grant microphone permission.';
@@ -41,31 +41,45 @@
     }
 
     async function sendAudio() {
-      const blob = new Blob(chunks, { type: 'audio/webm' });
-      const arrayBuffer = await blob.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      const res = await fetch('/v1/ai/voice', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ audio: base64 })
-      });
-      const data = await res.json();
-      transcriptEl.textContent = `You said: ${data.data.transcript}\nAgent: ${data.data.reply}`;
-      if (data.data.audio) {
-        const audio = new Audio('data:audio/wav;base64,' + data.data.audio);
-        audio.play();
+      button.disabled = true;
+      transcriptEl.textContent = 'Processing...';
+      try {
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(blob);
+          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          reader.onerror = reject;
+        });
+        const res = await fetch('/v1/ai/voice', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio: base64 })
+        });
+        if (!res.ok) {
+          throw new Error(`Server returned status ${res.status}: ${await res.text()}`);
+        }
+        const data = await res.json();
+        transcriptEl.textContent = `You said: ${data.data.transcript}\nAgent: ${data.data.reply}`;
+        if (data.data.audio) {
+          const audio = new Audio('data:audio/wav;base64,' + data.data.audio);
+          audio.play();
+        }
+      } catch (err) {
+        console.error('Error in sendAudio:', err);
+        transcriptEl.textContent = 'Sorry, something went wrong processing your request.';
+      } finally {
+        button.disabled = false;
       }
     }
 
-    button.addEventListener('click', async () => {
-      if (!recording) {
-        await startRecording();
-      } else {
-        await stopRecording();
-        recording = false;
-        button.textContent = 'Start Recording';
-        await sendAudio();
-      }
+    button.addEventListener('mousedown', startRecording);
+    button.addEventListener('mouseup', async () => {
+      if (!recording) return;
+      await stopRecording();
+      recording = false;
+      button.textContent = 'Hold to Record';
+      await sendAudio();
     });
   </script>
 </body>

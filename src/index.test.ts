@@ -13,6 +13,10 @@ vi.mock('./lib/homeAssistantWs', () => ({
 import app from './index';
 import type { Env } from './index';
 
+if (!(globalThis as any).atob) {
+  (globalThis as any).atob = (b64: string) => Buffer.from(b64, 'base64').toString('binary');
+}
+
 // Simple mocks for bindings with minimal type fixes
 const bindings: Env = {
   D1_DB: {
@@ -115,9 +119,10 @@ describe('Alexa REST API scaffold', () => {
   });
 
   it('handles voice interaction', async () => {
+    const base64Audio = Buffer.from('fake').toString('base64');
     const res = await app.request(
       '/v1/ai/voice',
-      { method: 'POST', body: JSON.stringify({ audio: 'abc' }) },
+      { method: 'POST', body: JSON.stringify({ audio: base64Audio }) },
       bindings,
       ctx
     );
