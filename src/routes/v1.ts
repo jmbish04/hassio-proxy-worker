@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { ok } from '../lib/response';
-import type { Env } from '../index';
+import type { Env } from '../types';
 import { haFetch } from '../lib/homeAssistant';
 import { getHaClient } from '../lib/homeAssistantWs';
 import { createWorkersAI } from 'workers-ai-provider';

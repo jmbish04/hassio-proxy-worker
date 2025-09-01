@@ -7,8 +7,8 @@
  * `env.HASSIO_ENDPOINT_URI`.
  */
 
-import type { Env } from '../index';
-import { logger } from './logger';
+
+import type { Env } from '../types';
 
 interface PendingRequest {
   resolve: (value: any) => void;

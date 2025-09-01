@@ -11,7 +11,7 @@ vi.mock('./lib/homeAssistantWs', () => ({
 }));
 
 import app from './index';
-import type { Env } from './index';
+import type { Env } from './types';
 
 // Simple mocks for bindings with minimal type fixes
 const bindings: Env = {

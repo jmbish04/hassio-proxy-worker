@@ -9,39 +9,14 @@
 
 import { Hono } from 'hono';
 import { v1 } from './routes/v1';
+import type { Env } from './types';
 import { logger } from './lib/logger';
 
 
 // Export the Durable Object class with the name expected by wrangler.toml
 export { HomeAssistantWebSocket } from './durable-objects/homeAssistant';
 
-/**
- * @interface Env
- * @description Defines the bindings and environment variables available to the Worker.
- * These are configured in the wrangler.toml file or the Cloudflare dashboard.
- * @property {D1Database} D1_DB - Binding for the D1 database.
- * @property {KVNamespace} CONFIG_KV - Key-Value namespace for configuration data.
- * @property {KVNamespace} SESSIONS_KV - Key-Value namespace for session storage.
- * @property {KVNamespace} CACHE_KV - Key-Value namespace for caching.
- * @property {R2Bucket} LOGS_BUCKET - Binding for the R2 bucket used for storing logs.
- * @property {Ai} AI - Binding for Cloudflare's AI services.
- * @property {DurableObjectNamespace} WEBSOCKET_SERVER - Namespace binding for the WebSocket Durable Object.
- * @property {Fetcher} ASSETS - Binding to the static assets service (for serving the frontend).
- * @property {string} HASSIO_ENDPOINT_URI - The endpoint URI for the Home Assistant instance.
- * @property {string} HASSIO_TOKEN - The long-lived access token for Home Assistant.
- */
-export interface Env {
-	D1_DB: D1Database;
-	CONFIG_KV: KVNamespace;
-	SESSIONS_KV: KVNamespace;
-	CACHE_KV: KVNamespace;
-	LOGS_BUCKET: R2Bucket;
-	AI: Ai;
-	WEBSOCKET_SERVER: DurableObjectNamespace;
-	ASSETS: Fetcher;
-	HASSIO_ENDPOINT_URI: string;
-	HASSIO_TOKEN: string;
-}
+
 
 /**
  * @constant {number} startTime

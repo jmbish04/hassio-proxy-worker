@@ -1,4 +1,4 @@
-import type { Env } from '../index';
+import type { Env } from '../types';
 import { getInstanceConfig } from '../lib/homeAssistant';
 import { logger } from '../lib/logger';
 
