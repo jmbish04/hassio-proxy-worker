@@ -115,9 +115,10 @@ describe('Alexa REST API scaffold', () => {
   });
 
   it('handles voice interaction', async () => {
+    const fakeAudio = Buffer.from('abc').toString('base64');
     const res = await app.request(
       '/v1/ai/voice',
-      { method: 'POST', body: JSON.stringify({ audio: 'abc' }) },
+      { method: 'POST', body: JSON.stringify({ audio: fakeAudio }) },
       bindings,
       ctx
     );
