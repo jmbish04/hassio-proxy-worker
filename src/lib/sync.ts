@@ -40,7 +40,9 @@ export async function syncEntitiesFromHA(
     let synced = 0;
     let errors = 0;
 
-    // Process each entity state
+    // Collect statements for batch insertion
+    const insertStatements: D1PreparedStatement[] = [];
+
     for (const state of states) {
       try {
         if (!state.entity_id) continue;
@@ -53,7 +55,7 @@ export async function syncEntitiesFromHA(
         const unitOfMeasure = state.attributes?.unit_of_measurement || null;
         const area = state.attributes?.area_id || null;
 
-        await db
+        const stmt = db
           .prepare(
             `INSERT OR REPLACE INTO entities (
                 id, source_id, domain, object_id, friendly_name, icon,
@@ -75,13 +77,24 @@ export async function syncEntitiesFromHA(
               device_class: state.attributes?.device_class,
               entity_category: state.attributes?.entity_category,
             }),
-          )
-          .run();
+          );
 
-        synced++;
+        insertStatements.push(stmt);
       } catch (entityError) {
-        logger.error(`Failed to sync entity ${state.entity_id}:`, entityError);
+        logger.error(`Failed to prepare entity ${state.entity_id}:`, entityError);
         errors++;
+      }
+    }
+
+    if (insertStatements.length > 0) {
+      const results = await db.batch(insertStatements);
+      for (const result of results) {
+        if (result.success) {
+          synced++;
+        } else {
+          logger.error("Failed to sync entity batch item:", result.error);
+          errors++;
+        }
       }
     }
 
