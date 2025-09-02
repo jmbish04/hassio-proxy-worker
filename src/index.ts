@@ -98,22 +98,22 @@ app.get("/health", async (c) => {
 	}
 
 	// Check Home Assistant WebSocket API connectivity
-        let websocketApiStatus = false;
-        if (hasCredentials) {
-                try {
-                        const healthCheckClient = getHaClient(c.env);
-                        const configResponse = await Promise.race([
-                                healthCheckClient.getConfig(),
-                                new Promise((_, reject) =>
-                                        setTimeout(() => reject(new Error("WebSocket timeout")), 3000),
-                                ),
-                        ]);
-                        websocketApiStatus = !!configResponse;
-                } catch (error) {
-                        logger.debug("Home Assistant WebSocket API check failed:", error);
-                        websocketApiStatus = false;
-                }
-        }
+	let websocketApiStatus = false;
+	if (hasCredentials) {
+		try {
+			const healthCheckClient = getHaClient(c.env);
+			const configResponse = await Promise.race([
+				healthCheckClient.getConfig(),
+				new Promise((_, reject) =>
+					setTimeout(() => reject(new Error("WebSocket timeout")), 3000),
+				),
+			]);
+			websocketApiStatus = !!configResponse;
+		} catch (error) {
+			logger.debug("Home Assistant WebSocket API check failed:", error);
+			websocketApiStatus = false;
+		}
+	}
 
 	return c.json({
 		ok: true,
