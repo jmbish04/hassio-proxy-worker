@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -21,7 +22,37 @@
   </script>
   <!-- Inter font -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* Custom animation for the LIVE badge */
+    @keyframes pulse-fade {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    .animate-pulse-fade {
+      animation: pulse-fade 2s ease-in-out infinite;
+    }
+  </style>
+  }
+
+  50% {
+  opacity: 0.4;
+  }
+  }
+
+  .animate-pulse-fade {
+  animation: pulse-fade 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  </style>
 </head>
+
 <body class="bg-gray-900 text-gray-100 font-sans">
   <div class="max-w-3xl mx-auto p-4 space-y-6">
     <header>
@@ -34,17 +65,92 @@
         <h2 class="text-xl font-semibold">Worker Health</h2>
         <button id="refreshHealth" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded">Refresh</button>
       </div>
-      <p id="healthStatus" aria-live="polite">Loading...</p>
+      <div class="space-y-2">
+        <p id="healthStatus" aria-live="polite">Loading...</p>
+        <p id="haRestStatus" aria-live="polite">Home Assistant REST API: <span class="text-gray-400">Checking...</span>
+        </p>
+        <p id="haWsStatus" aria-live="polite">Home Assistant WebSocket API: <span
+            class="text-gray-400">Checking...</span></p>
+      </div>
+    </section>
+
+    <!-- AI Brain Control Section -->
+    <section class="bg-gray-800 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">🧠 AI Brain System</h2>
+        <div class="flex gap-2">
+          <button id="refreshBrainStatus" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 rounded">Refresh</button>
+          <button id="runBrainSweep" class="px-3 py-1 bg-orange-600 hover:bg-orange-500 rounded">Run Brain
+            Sweep</button>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div id="brainStatus" class="space-y-2">
+          <p id="brainLastRun" aria-live="polite">Last Run: <span class="text-gray-400">Loading...</span></p>
+          <p id="brainEntities" aria-live="polite">Entities: <span class="text-gray-400">Loading...</span></p>
+          <p id="brainIntents" aria-live="polite">Intents: <span class="text-gray-400">Loading...</span></p>
+        </div>
+        <div id="brainProgress" class="hidden">
+          <div class="bg-gray-700 rounded-full h-2">
+            <div id="brainProgressBar" class="bg-orange-500 h-2 rounded-full transition-all duration-300"
+              style="width: 0%"></div>
+          </div>
+          <p id="brainProgressText" class="text-sm text-gray-400 mt-1">Processing...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Live WebSocket Monitor -->
+    <section class="bg-gray-800 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">📡 Live WebSocket Monitor</h2>
+        <div class="flex gap-2">
+          <button id="clearWsLog" class="px-3 py-1 bg-red-600 hover:bg-red-500 rounded">Clear</button>
+          <button id="toggleWsMonitor" class="px-3 py-1 bg-green-600 hover:bg-green-500 rounded">Start Monitor</button>
+        </div>
+      </div>
+      <div class="space-y-3">
+        <div id="wsConnectionStatus" class="text-sm">
+          Status: <span id="wsStatusIndicator" class="text-gray-400">Disconnected</span>
+        </div>
+        <div class="bg-gray-900 rounded p-3 h-48 overflow-y-auto">
+          <div id="wsLog" class="text-xs font-mono space-y-1">
+            <div class="text-gray-500">WebSocket operations will appear here...</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Home Assistant Cameras -->
+    <section class="bg-gray-800 rounded-lg p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold">📹 Camera Feeds</h2>
+        <div class="flex gap-2">
+          <button id="toggleCameras" class="px-3 py-1 bg-gray-600 hover:bg-gray-500 rounded text-sm">
+            <span id="toggleCamerasText">▼ Collapse</span>
+          </button>
+          <button id="refreshCameras" class="px-3 py-1 bg-blue-600 hover:bg-blue-500 rounded">Refresh</button>
+        </div>
+      </div>
+      <div id="cameraContent" class="transition-all duration-300">
+        <div id="cameraGrid" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div class="text-gray-400">Loading cameras...</div>
+        </div>
+      </div>
     </section>
 
     <!-- Diagnostics Section -->
     <section class="bg-gray-800 rounded-lg p-6">
       <h2 class="text-xl font-semibold mb-4">Run Diagnostics</h2>
       <div class="grid gap-4 sm:grid-cols-2">
-        <button data-endpoint="/v1/devices/scan" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Scan Devices</button>
-        <button data-endpoint="/v1/protect/sync" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Sync Protect</button>
-        <button data-endpoint="/v1/ai/summary" data-body='{"prompt":"Provide a quick summary of this sample text."}' class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Test AI Summary</button>
-        <button data-endpoint="/v1/webhooks/logs" data-body='' class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Send Test Log</button>
+        <button data-endpoint="/v1/devices/scan" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Scan
+          Devices</button>
+        <button data-endpoint="/v1/protect/sync" class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Sync
+          Protect</button>
+        <button data-endpoint="/v1/ai/summary" data-body='{"prompt":"Provide a quick summary of this sample text."}'
+          class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Test AI Summary</button>
+        <button data-endpoint="/v1/webhooks/logs" data-body=''
+          class="px-3 py-2 bg-blue-600 hover:bg-blue-500 rounded">Send Test Log</button>
       </div>
     </section>
 
@@ -59,7 +165,8 @@
     <!-- Test Results Section -->
     <section class="bg-gray-800 rounded-lg p-6">
       <h2 class="text-xl font-semibold mb-4">Test Results</h2>
-      <pre class="bg-gray-900 p-4 rounded overflow-auto"><code id="resultOutput" class="text-sm" aria-live="polite">No test run yet.</code></pre>
+      <pre
+        class="bg-gray-900 p-4 rounded overflow-auto"><code id="resultOutput" class="text-sm" aria-live="polite">No test run yet.</code></pre>
     </section>
   </div>
 
@@ -75,10 +182,16 @@
         return 'N/A';
       }
 
-      totalSeconds = Math.floor(totalSeconds);
+      // Ensure we have a valid positive number
+      totalSeconds = Math.max(0, Math.floor(totalSeconds));
 
       if (totalSeconds < 1) {
         return 'less than a second';
+      }
+
+      // Sanity check: if uptime is more than 365 days, something is wrong
+      if (totalSeconds > 365 * 24 * 60 * 60) {
+        return 'Invalid uptime (system error)';
       }
 
       const days = Math.floor(totalSeconds / 86400);
@@ -100,15 +213,592 @@
     // Fetch and display health information for the worker
     async function fetchHealth() {
       const statusEl = document.getElementById('healthStatus');
+      const haRestStatusEl = document.getElementById('haRestStatus');
+      const haWsStatusEl = document.getElementById('haWsStatus');
+
       statusEl.textContent = 'Loading...';
+      haRestStatusEl.innerHTML = 'Home Assistant REST API: <span class="text-gray-400">Checking...</span>';
+      haWsStatusEl.innerHTML = 'Home Assistant WebSocket API: <span class="text-gray-400">Checking...</span>';
+
       try {
         const res = await fetch('/health');
         if (!res.ok) throw new Error(`Network response was not ok: ${res.status} ${res.statusText}`);
         const data = await res.json();
         const formattedUptime = formatUptime(data.uptime);
-        statusEl.textContent = `Status: ${data.ok ? 'OK' : 'NOT OK'} | Uptime: ${formattedUptime}`;
+        const statusIcon = data.ok ? '✅' : '❌';
+        const statusText = data.ok ? 'OK' : 'NOT OK';
+        statusEl.textContent = `Status: ${statusIcon} ${statusText} | Uptime: ${formattedUptime}`;
+
+        // Update Home Assistant status indicators
+        if (data.homeAssistant) {
+          if (!data.homeAssistant.configured) {
+            haRestStatusEl.innerHTML = 'Home Assistant REST API: <span class="text-yellow-400">Not Configured</span>';
+            haWsStatusEl.innerHTML = 'Home Assistant WebSocket API: <span class="text-yellow-400">Not Configured</span>';
+          } else {
+            const restIcon = data.homeAssistant.restApi ? '✅' : '❌';
+            const wsIcon = data.homeAssistant.websocketApi ? '✅' : '❌';
+
+            haRestStatusEl.innerHTML = `Home Assistant REST API: ${restIcon}`;
+            haWsStatusEl.innerHTML = `Home Assistant WebSocket API: ${wsIcon}`;
+          }
+        } else {
+          haRestStatusEl.innerHTML = 'Home Assistant REST API: <span class="text-gray-400">Unknown</span>';
+          haWsStatusEl.innerHTML = 'Home Assistant WebSocket API: <span class="text-gray-400">Unknown</span>';
+        }
       } catch (err) {
         statusEl.textContent = `Error: ${err.message}`;
+        haRestStatusEl.innerHTML = 'Home Assistant REST API: <span class="text-red-400">Error</span>';
+        haWsStatusEl.innerHTML = 'Home Assistant WebSocket API: <span class="text-red-400">Error</span>';
+      }
+    }
+
+    // Helper function to format timestamp as "time ago"
+    function formatTimeAgo(timestamp) {
+      if (!timestamp) return 'Never';
+
+      const now = new Date();
+      const runTime = new Date(timestamp);
+      const diffMs = now - runTime;
+      const diffSeconds = Math.floor(diffMs / 1000);
+      const diffMinutes = Math.floor(diffSeconds / 60);
+      const diffHours = Math.floor(diffMinutes / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffSeconds < 60) {
+        return `${diffSeconds} seconds ago`;
+      } else if (diffMinutes < 60) {
+        return `${diffMinutes} minute${diffMinutes !== 1 ? 's' : ''} ago`;
+      } else if (diffHours < 24) {
+        return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+      } else {
+        return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+      }
+    }
+
+    // Brain system functions
+    async function fetchBrainStatus() {
+      const lastRunEl = document.getElementById('brainLastRun');
+      const entitiesEl = document.getElementById('brainEntities');
+      const intentsEl = document.getElementById('brainIntents');
+
+      lastRunEl.innerHTML = 'Last Run: <span class="text-gray-400">Loading...</span>';
+      entitiesEl.innerHTML = 'Entities: <span class="text-gray-400">Loading...</span>';
+      intentsEl.innerHTML = 'Intents: <span class="text-gray-400">Loading...</span>';
+
+      try {
+        const res = await fetch('/v1/brain/status');
+        if (!res.ok) throw new Error(`Failed to fetch brain status: ${res.status}`);
+        const data = await res.json();
+
+        if (data.ok && data.data) {
+          const { entities, intents, lastRun } = data.data;
+
+          // Format last run display with detailed information
+          if (lastRun && lastRun.ranAt) {
+            const timeAgo = formatTimeAgo(lastRun.ranAt);
+            const runDate = new Date(lastRun.ranAt).toLocaleString();
+            lastRunEl.innerHTML = `Last Run: <span class="text-green-400" title="${runDate}">${timeAgo}</span>
+              <span class="text-gray-400 text-xs">(${lastRun.scanned} scanned, ${lastRun.normalized} normalized, ${lastRun.intentsCreated} intents)</span>`;
+          } else {
+            lastRunEl.innerHTML = `Last Run: <span class="text-yellow-400">Never</span>`;
+          }
+
+          entitiesEl.innerHTML = `Entities: <span class="text-blue-400">${entities.normalized}/${entities.total} normalized</span> <span class="text-orange-400">(${entities.unbrained} pending)</span>`;
+          intentsEl.innerHTML = `Intents: <span class="text-green-400">${intents.total} total</span> <span class="text-gray-400">(avg ${intents.averagePerEntity}/entity)</span>`;
+        } else {
+          throw new Error(data.error || 'Unknown error');
+        }
+      } catch (err) {
+        lastRunEl.innerHTML = `Last Run: <span class="text-red-400">Error: ${err.message}</span>`;
+        entitiesEl.innerHTML = 'Entities: <span class="text-red-400">Error</span>';
+        intentsEl.innerHTML = 'Intents: <span class="text-red-400">Error</span>';
+      }
+    }
+
+    async function runBrainSweep() {
+      const button = document.getElementById('runBrainSweep');
+      const progressDiv = document.getElementById('brainProgress');
+      const progressBar = document.getElementById('brainProgressBar');
+      const progressText = document.getElementById('brainProgressText');
+
+      button.disabled = true;
+      button.textContent = 'Running...';
+      progressDiv.classList.remove('hidden');
+      progressBar.style.width = '10%';
+      progressText.textContent = 'Starting brain sweep...';
+
+      try {
+        progressBar.style.width = '50%';
+        progressText.textContent = 'Processing entities and generating intents...';
+
+        const res = await fetch('/v1/brain/run');
+        if (!res.ok) throw new Error(`Failed to run brain sweep: ${res.status}`);
+        const data = await res.json();
+
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Brain sweep completed!';
+
+        if (data.ok && data.data) {
+          const { scanned, normalized, intentsCreated } = data.data;
+          progressText.textContent = `Completed: ${scanned} scanned, ${normalized} normalized, ${intentsCreated} intents created`;
+
+          // Refresh brain status after completion
+          setTimeout(() => {
+            fetchBrainStatus();
+            progressDiv.classList.add('hidden');
+          }, 2000);
+        } else {
+          throw new Error(data.error || 'Unknown error');
+        }
+      } catch (err) {
+        progressBar.style.width = '100%';
+        progressBar.classList.add('bg-red-500');
+        progressText.textContent = `Error: ${err.message}`;
+        setTimeout(() => {
+          progressDiv.classList.add('hidden');
+          progressBar.classList.remove('bg-red-500');
+        }, 3000);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Run Brain Sweep';
+      }
+    }
+
+    // WebSocket monitoring
+    let wsMonitor = null;
+    let wsLogElement = null;
+    let isMonitoring = false;
+
+    function addWsLogEntry(type, message, data = null) {
+      if (!wsLogElement) return;
+
+      const timestamp = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+
+      // Set colors based on entry type
+      let colorClass;
+      switch (type) {
+        case 'error':
+          colorClass = 'text-red-400';
+          break;
+        case 'success':
+          colorClass = 'text-green-400';
+          break;
+        case 'warning':
+          colorClass = 'text-yellow-400';
+          break;
+        case 'event':
+          colorClass = 'text-purple-400';
+          break;
+        case 'info':
+          colorClass = 'text-blue-400';
+          break;
+        default:
+          colorClass = 'text-gray-300';
+      }
+
+      entry.className = `text-xs ${colorClass}`;
+
+      let content = `[${timestamp}] ${message}`;
+      if (data) {
+        if (type === 'event' && data.entity_id) {
+          // Format event data nicely
+          content += ` (${data.domain}, ${data.age})`;
+        } else {
+          content += `\n${JSON.stringify(data, null, 2)}`;
+        }
+      }
+      entry.textContent = content;
+
+      wsLogElement.appendChild(entry);
+      wsLogElement.scrollTop = wsLogElement.scrollHeight;
+
+      // Keep only last 50 entries
+      while (wsLogElement.children.length > 50) {
+        wsLogElement.removeChild(wsLogElement.firstChild);
+      }
+    }
+
+    function toggleWebSocketMonitor() {
+      const button = document.getElementById('toggleWsMonitor');
+      const statusIndicator = document.getElementById('wsStatusIndicator');
+
+      if (!isMonitoring) {
+        // Start monitoring
+        isMonitoring = true;
+        button.textContent = 'Stop Monitor';
+        button.className = 'px-3 py-1 bg-red-600 hover:bg-red-500 rounded';
+        statusIndicator.textContent = 'Connecting...';
+        statusIndicator.className = 'text-yellow-400';
+
+        // Simulate WebSocket monitoring by calling HA WebSocket API
+        startWebSocketMonitoring();
+      } else {
+        // Stop monitoring
+        isMonitoring = false;
+        button.textContent = 'Start Monitor';
+        button.className = 'px-3 py-1 bg-green-600 hover:bg-green-500 rounded';
+        statusIndicator.textContent = 'Disconnected';
+        statusIndicator.className = 'text-gray-400';
+
+        if (wsMonitor) {
+          clearInterval(wsMonitor);
+          wsMonitor = null;
+        }
+        addWsLogEntry('info', 'WebSocket monitoring stopped');
+      }
+    }
+
+    async function startWebSocketMonitoring() {
+      const statusIndicator = document.getElementById('wsStatusIndicator');
+
+      addWsLogEntry('info', 'Starting WebSocket monitor...');
+
+      // Test WebSocket connection by getting states
+      try {
+        const response = await fetch('/v1/devices/scan', { method: 'POST' });
+        if (response.ok) {
+          statusIndicator.textContent = 'Connected';
+          statusIndicator.className = 'text-green-400';
+          addWsLogEntry('success', 'WebSocket connection test successful');
+
+          // Start periodic monitoring with real events
+          wsMonitor = setInterval(async () => {
+            if (!isMonitoring) return;
+
+            try {
+              // Get recent events from Home Assistant
+              const eventsRes = await fetch('/v1/websocket/events');
+              if (eventsRes.ok) {
+                const eventsData = await eventsRes.json();
+                if (eventsData.ok && eventsData.data.events.length > 0) {
+                  // Show the most recent event
+                  const recentEvent = eventsData.data.events[0];
+                  addWsLogEntry('event', `${recentEvent.friendly_name}: ${recentEvent.new_state}`, {
+                    entity_id: recentEvent.entity_id,
+                    domain: recentEvent.domain,
+                    age: `${recentEvent.age_minutes}m ago`
+                  });
+                } else {
+                  addWsLogEntry('info', 'WebSocket heartbeat: No recent events');
+                }
+              } else {
+                addWsLogEntry('warning', 'WebSocket events fetch failed');
+              }
+
+              // Also check basic connectivity
+              const healthRes = await fetch('/health');
+              if (healthRes.ok) {
+                const health = await healthRes.json();
+                if (!health.homeAssistant?.websocketApi) {
+                  addWsLogEntry('warning', 'WebSocket API connectivity issue');
+                }
+              }
+            } catch (err) {
+              addWsLogEntry('error', 'WebSocket monitoring error', { error: err.message });
+            }
+          }, 15000); // Check every 15 seconds
+
+        } else {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      } catch (err) {
+        statusIndicator.textContent = 'Connection Failed';
+        statusIndicator.className = 'text-red-400';
+        addWsLogEntry('error', 'WebSocket connection failed', { error: err.message });
+
+        // Auto-stop monitoring on failure
+        setTimeout(() => {
+          if (isMonitoring) {
+            toggleWebSocketMonitor();
+          }
+        }, 5000);
+      }
+    }
+
+    // Camera functions
+    async function fetchCameras() {
+      const cameraGrid = document.getElementById('cameraGrid');
+      cameraGrid.innerHTML = '<div class="text-gray-400">Loading cameras...</div>';
+
+      try {
+        const response = await fetch('/v1/cameras');
+        if (!response.ok) throw new Error(`Failed to fetch cameras: ${response.status}`);
+
+        const data = await response.json();
+        if (!data.ok) throw new Error(data.error || 'Failed to load cameras');
+
+        const { cameras, summary } = data.data;
+
+        if (cameras.length === 0) {
+          cameraGrid.innerHTML = '<div class="text-gray-400">No cameras found in Home Assistant</div>';
+          return;
+        }
+
+        cameraGrid.innerHTML = '';
+
+        // Add summary header
+        const summaryCard = document.createElement('div');
+        summaryCard.className = 'col-span-full bg-gray-700 rounded-lg p-3 mb-2';
+        summaryCard.innerHTML = `
+          <div class="flex justify-between text-sm">
+            <span>📹 ${summary.total} cameras found</span>
+            <span>
+              <span class="text-green-400">${summary.online} online</span> •
+              <span class="text-red-400">${summary.offline} offline</span>
+            </span>
+          </div>
+        `;
+        cameraGrid.appendChild(summaryCard);
+
+        // Add camera cards
+        cameras.forEach(camera => {
+          const cameraCard = document.createElement('div');
+          cameraCard.className = 'bg-gray-700 rounded-lg p-4';
+
+          const statusColor = camera.state === 'streaming' ? 'text-green-400' :
+            camera.state === 'idle' ? 'text-yellow-400' : 'text-red-400';
+
+          const hasStream = camera.stream_url || camera.entity_picture;
+          const hasLiveStream = camera.has_live_stream;
+          const isOnline = camera.state !== 'unavailable' && camera.state !== 'unknown' && camera.state !== 'error';
+
+          cameraCard.innerHTML = `
+            <div class="aspect-video bg-gray-900 rounded mb-2 flex items-center justify-center relative overflow-hidden">
+              ${hasStream ?
+              `<img src="${hasLiveStream ? camera.stream_url : (camera.stream_url || camera.entity_picture)}"
+                      alt="${camera.friendly_name}"
+                      class="w-full h-full object-cover"
+                      onerror="this.style.display='none'; this.nextElementSibling.style.display='flex'">
+                 <div class="absolute inset-0 flex items-center justify-center text-gray-500" style="display: none;">
+                   📹 Stream Unavailable
+                 </div>
+                 ${hasLiveStream && isOnline ?
+                '<div class="absolute top-2 left-2 bg-red-600 text-white text-xs px-2 py-1 rounded animate-pulse-fade">🔴 LIVE</div>' :
+                (hasStream ? '<div class="absolute top-2 left-2 bg-gray-600 text-white text-xs px-2 py-1 rounded">📸 STATIC</div>' : '')
+              }` :
+              `<span class="text-gray-500">📹 No Stream Available</span>`
+            }
+            </div>
+            <h3 class="font-medium text-sm">${camera.friendly_name}</h3>
+            <p class="text-xs ${statusColor} mb-1">${camera.state}</p>
+            <p class="text-xs text-gray-400 mb-2">${camera.brand}</p>
+            <div class="flex gap-1">
+              <button class="flex-1 px-2 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs"
+                      onclick="openCameraStream('${camera.entity_id}', '${hasLiveStream ? camera.live_stream_endpoint : (camera.stream_url || camera.entity_picture || '')}', ${hasLiveStream})">
+                View
+              </button>
+              <button class="px-2 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs"
+                      onclick="refreshCamera('${camera.entity_id}')">
+                ↻
+              </button>
+            </div>
+          `;
+
+          cameraGrid.appendChild(cameraCard);
+        });
+
+      } catch (err) {
+        cameraGrid.innerHTML = `<div class="text-red-400">Error loading cameras: ${err.message}</div>`;
+      }
+    }
+
+    function openCameraStream(entityId, streamUrl, isLiveStream = false) {
+      addWsLogEntry('info', `Opening ${isLiveStream ? 'live' : 'static'} stream for ${entityId}`);
+
+      // Open stream in new window/tab with loading indicator
+      const streamWindow = window.open('', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+      if (!streamWindow) {
+        alert('Popup blocked. Please allow popups for this site to view camera streams.');
+        return;
+      }
+
+      // Create initial loading page
+      streamWindow.document.write(`
+        <html>
+          <head>
+            <title>${entityId} - Live Camera Stream</title>
+            <style>
+              body { margin: 0; background: #000; color: white; font-family: Arial, sans-serif; }
+              .container { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+              .loading { text-align: center; }
+              .stream-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+              .stream-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+              .error { color: #ff6b6b; text-align: center; padding: 20px; }
+              .controls { position: fixed; top: 10px; right: 10px; z-index: 1000; }
+              .btn { background: rgba(0,0,0,0.7); color: white; border: none; padding: 8px 12px; margin: 2px; border-radius: 4px; cursor: pointer; }
+              .btn:hover { background: rgba(0,0,0,0.9); }
+            </style>
+          </head>
+          <body>
+            <div class="controls">
+              <button class="btn" onclick="refreshStream()">🔄 Refresh</button>
+              <button class="btn" onclick="window.close()">✕ Close</button>
+            </div>
+            <div class="container">
+              <div id="loading" class="loading">
+                <div>📹 Loading ${isLiveStream ? 'live' : 'static'} stream for ${entityId}...</div>
+                <div style="margin-top: 10px; font-size: 14px; opacity: 0.7;">${isLiveStream ? 'Getting live stream URL from Home Assistant...' : 'Loading camera snapshot...'}</div>
+              </div>
+              <div id="streamContainer" class="stream-container" style="display: none;"></div>
+              <div id="error" class="error" style="display: none;"></div>
+            </div>
+            <script>
+              let currentStreamUrl = '';
+              const entityId = '${entityId}';
+              const fallbackStreamUrl = '${streamUrl}';
+              const isLiveStream = ${isLiveStream};
+
+              async function loadLiveStream() {
+                const loading = document.getElementById('loading');
+                const container = document.getElementById('streamContainer');
+                const error = document.getElementById('error');
+
+                try {
+                  loading.style.display = 'block';
+                  container.style.display = 'none';
+                  error.style.display = 'none';
+
+                  if (isLiveStream) {
+                    // For live streams, the live_stream_endpoint should be a direct stream URL
+                    currentStreamUrl = fallbackStreamUrl; // This is the live_stream_endpoint
+                    loading.innerHTML = '<div>📹 Connecting to live stream...</div><div style="font-size: 12px; margin-top: 5px;">Streaming directly from Home Assistant...</div>';
+
+                    // Create stream element for live stream - assume MJPEG
+                    container.innerHTML = \`
+                      <img class="stream-img"
+                           src="\${currentStreamUrl}&_t=\${Date.now()}"
+                           alt="\${entityId} Live Stream"
+                           onload="document.getElementById('loading').style.display='none'; document.getElementById('streamContainer').style.display='flex';"
+                           onerror="handleStreamError('Stream connection failed')" />
+                    \`;
+
+                    // Auto-refresh live stream every 3 seconds for live updates
+                    setInterval(() => {
+                      const img = container.querySelector('img');
+                      if (img) {
+                        img.src = currentStreamUrl + '&_t=' + Date.now();
+                      }
+                    }, 3000);
+
+                  } else {
+                    // Static snapshot view
+                    currentStreamUrl = fallbackStreamUrl;
+                    loading.innerHTML = '<div>📸 Loading camera snapshot...</div>';
+
+                    container.innerHTML = \`
+                      <img class="stream-img"
+                           src="\${currentStreamUrl}"
+                           alt="\${entityId} Snapshot"
+                           onload="document.getElementById('loading').style.display='none'; document.getElementById('streamContainer').style.display='flex';"
+                           onerror="handleStreamError('Stream connection failed')" />
+                    \`;
+                  }
+
+                } catch (err) {
+                  handleStreamError('Failed to connect to stream: ' + err.message);
+                }
+              }              function handleStreamError(message) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('streamContainer').style.display = 'none';
+                const errorDiv = document.getElementById('error');
+
+                // Show the actual stream URL for debugging
+                const urlInfo = currentStreamUrl ?
+                  \`<div style="margin-top: 10px; font-size: 12px; color: #888; word-break: break-all;">Stream URL: \${currentStreamUrl}</div>\` :
+                  '';
+
+                if (isLiveStream) {
+                  errorDiv.innerHTML = \`
+                    <div>\${message}</div>
+                    \${urlInfo}
+                    <div style="margin-top: 15px;">
+                      <button class="btn" onclick="loadLiveStream()">🔄 Retry Live Stream</button>
+                      <button class="btn" onclick="loadFallback()">📸 View Snapshot</button>
+                    </div>
+                  \`;
+                } else {
+                  errorDiv.innerHTML = \`
+                    <div>\${message}</div>
+                    \${urlInfo}
+                    <div style="margin-top: 15px;">
+                      <button class="btn" onclick="loadLiveStream()">🔄 Retry</button>
+                    </div>
+                  \`;
+                }
+                errorDiv.style.display = 'block';
+              }
+
+              function loadFallback() {
+                const container = document.getElementById('streamContainer');
+                const error = document.getElementById('error');
+                container.innerHTML = \`
+                  <img class="stream-img"
+                       src="\${fallbackStreamUrl}"
+                       alt="\${entityId} Snapshot"
+                       onload="document.getElementById('error').style.display='none'; this.parentElement.style.display='flex';" />
+                \`;
+                error.style.display = 'none';
+              }
+
+              function refreshStream() {
+                loadLiveStream();
+              }
+
+              // Start loading the stream
+              loadLiveStream();
+            <\/script>
+          </body>
+        </html>
+      `);
+      streamWindow.document.close();
+    }
+
+    async function refreshCamera(entityId) {
+      addWsLogEntry('info', `Refreshing camera ${entityId}...`);
+
+      try {
+        const response = await fetch(`/v1/cameras/${entityId}/refresh`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to refresh camera: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.ok) {
+          addWsLogEntry('success', `Camera ${entityId} refreshed via ${data.data.method}`);
+          // Wait a moment for the camera to update, then refresh the camera list
+          setTimeout(() => {
+            fetchCameras();
+          }, 2000);
+        } else {
+          throw new Error(data.error || 'Camera refresh failed');
+        }
+      } catch (error) {
+        addWsLogEntry('error', `Camera refresh failed: ${error.message}`);
+        console.error('Camera refresh error:', error);
+      }
+    }
+
+    // Toggle camera section collapse/expand
+    function toggleCameraSection() {
+      const cameraContent = document.getElementById('cameraContent');
+      const toggleText = document.getElementById('toggleCamerasText');
+
+      if (cameraContent.style.display === 'none') {
+        // Expand
+        cameraContent.style.display = 'block';
+        toggleText.textContent = '▼ Collapse';
+      } else {
+        // Collapse
+        cameraContent.style.display = 'none';
+        toggleText.textContent = '▶ Expand';
       }
     }
 
@@ -132,8 +822,34 @@
 
     // Attach event listeners and perform initial health check
     document.addEventListener('DOMContentLoaded', () => {
+      // Initialize WebSocket log element
+      wsLogElement = document.getElementById('wsLog');
+
+      // Initial data loading
       fetchHealth();
+      fetchBrainStatus();
+      fetchCameras();
+
+      // Health section
       document.getElementById('refreshHealth').addEventListener('click', fetchHealth);
+
+      // Brain section
+      document.getElementById('refreshBrainStatus').addEventListener('click', fetchBrainStatus);
+      document.getElementById('runBrainSweep').addEventListener('click', runBrainSweep);
+
+      // WebSocket monitor section
+      document.getElementById('toggleWsMonitor').addEventListener('click', toggleWebSocketMonitor);
+      document.getElementById('clearWsLog').addEventListener('click', () => {
+        if (wsLogElement) {
+          wsLogElement.innerHTML = '<div class="text-gray-500">WebSocket operations will appear here...</div>';
+        }
+      });
+
+      // Camera section
+      document.getElementById('refreshCameras').addEventListener('click', fetchCameras);
+      document.getElementById('toggleCameras').addEventListener('click', toggleCameraSection);
+
+      // Existing diagnostic buttons
       document.querySelectorAll('[data-endpoint]').forEach(btn => {
         btn.addEventListener('click', () => {
           let body = btn.getAttribute('data-body');
@@ -153,4 +869,5 @@
     });
   </script>
 </body>
+
 </html>

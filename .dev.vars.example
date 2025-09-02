@@ -1,0 +1,10 @@
+# Development Environment Variables for Home Assistant
+# Copy this file to .dev.vars and update with your actual Home Assistant credentials
+# Note: .dev.vars should be added to .gitignore to keep credentials secure
+
+# Your Home Assistant URL (e.g., "http://homeassistant.local:8123" or "https://your-ha-domain.com")
+HASSIO_ENDPOINT_URI=http://homeassistant.local:8123
+
+# Your Home Assistant Long-Lived Access Token
+# Generate this from: Settings > People > [Your User] > Long-Lived Access Tokens
+HASSIO_TOKEN=your_long_lived_access_token_here

@@ -1,6 +1,5 @@
 import type { Env } from '../types';
-
-
+import { logger } from './logger';
 
 export interface InstanceConfig {
   baseUrl: string;
