@@ -103,15 +103,17 @@ describe("Alexa REST API scaffold", () => {
 		expect(res.status).toBe(200);
 		const data = await res.json();
 		expect(data.ok).toBe(true);
-		expect(data.data).toEqual({
-			added: 0,
-			updated: 2, // 2 unique devices from mock
-			total: 2,
-			entities: 3, // 3 entities from mock
-			domains: { sensor: 1, light: 1, switch: 1 },
-			summary: "Found 3 entities across 3 domains",
-			reportUrl: null,
-		});
+                expect(data.data).toEqual({
+                        added: 3,
+                        updated: 2, // 2 unique devices from mock
+                        total: 2,
+                        entities: 3, // 3 entities from mock
+                        entitiesSynced: 3,
+                        syncErrors: 0,
+                        domains: { sensor: 1, light: 1, switch: 1 },
+                        summary: "Found 3 entities across 3 domains, synced 3 to database",
+                        reportUrl: null,
+                });
 
 		globalThis.fetch = originalFetch;
 	});
