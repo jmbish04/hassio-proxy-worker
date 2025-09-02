@@ -9,15 +9,21 @@ import worker from "./index";
 
 // Simple mocks for bindings with minimal type fixes
 const bindings: WorkerEnv = {
-	D1_DB: {
-		prepare() {
-			return {
-				bind() {
-					return { async run() {} };
-				},
-			};
-		},
-	} as any,
+        D1_DB: {
+                prepare() {
+                        return {
+                                bind() {
+                                        return { async run() {} };
+                                },
+                        };
+                },
+                async batch(statements: any[]) {
+                        for (const stmt of statements) {
+                                await stmt.run();
+                        }
+                        return statements.map(() => ({ success: true }));
+                },
+        } as any,
 	CONFIG_KV: {
 		store: {} as Record<string, string>,
 		async get(key: string) {
