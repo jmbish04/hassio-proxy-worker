@@ -137,3 +137,6 @@ dist
 
 # Local development variables with sensitive credentials
 .dev.vars
+
+# Cloudflare Wrangler state
+.wrangler/

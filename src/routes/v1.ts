@@ -8,8 +8,11 @@ import {
   formatLogsForAI,
   type LogEntry,
   processHomeLogs,
+  parseErrorLogText,
+  extractErrorsFromStates,
 } from "../lib/logProcessor";
 import { ok } from "../lib/response";
+import { syncEntitiesFromHA } from "../lib/sync";
 
 export const v1 = new Hono<{ Bindings: WorkerEnv }>();
 
@@ -907,75 +910,6 @@ ${processedLogs.uniqueErrors.slice(0, 3).map(error => `- ${error}`).join('\n') |
 	}
 });
 
-/**
- * Parse Home Assistant error log text into structured log entries
- */
-function parseErrorLogText(logText: string): LogEntry[] {
-	const lines = logText.split("\n").filter((line) => line.trim());
-	const logs: LogEntry[] = [];
-
-	for (const line of lines) {
-		// Parse log format: TIMESTAMP LEVEL LOGGER: MESSAGE
-		const match = line.match(
-			/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\w+)\s+([^:]+):\s*(.+)$/,
-		);
-		if (match) {
-			logs.push({
-				timestamp: match[1],
-				level: match[2],
-				logger: match[3].trim(),
-				message: match[4].trim(),
-			});
-		} else if (line.trim()) {
-			// Fallback for non-standard format
-			logs.push({
-				timestamp: new Date().toISOString(),
-				level: "INFO",
-				logger: "unknown",
-				message: line.trim(),
-			});
-		}
-	}
-
-	return logs;
-}
-
-/**
- * Extract error information from Home Assistant states
- */
-function extractErrorsFromStates(states: unknown[]): LogEntry[] {
-	const logs: LogEntry[] = [];
-	const now = new Date().toISOString();
-
-	if (Array.isArray(states)) {
-		for (const state of states) {
-			// Type guard for state object
-			if (
-				typeof state === "object" &&
-				state !== null &&
-				"state" in state &&
-				"entity_id" in state
-			) {
-				const stateObj = state as {
-					state: string;
-					entity_id: string;
-					last_changed?: string;
-				};
-				if (stateObj.state === "unavailable" || stateObj.state === "unknown") {
-					logs.push({
-						timestamp: stateObj.last_changed || now,
-						level: "WARNING",
-						logger: "entity_state",
-						message: `Entity ${stateObj.entity_id} is ${stateObj.state}`,
-						source: "state_analysis",
-					});
-				}
-			}
-		}
-	}
-
-	return logs;
-}
 
 v1.post("/webhooks/logs", async (c) => {
 	const log = await c.req.json();
@@ -1282,90 +1216,3 @@ v1.get("/websocket/events", async (c) => {
 	}
 });
 
-/**
- * Sync entities from Home Assistant to database
- */
-async function syncEntitiesFromHA(
-	db: D1Database,
-	hassioEndpoint: string,
-	hassioToken: string,
-): Promise<{ synced: number; errors: number }> {
-	logger.debug("Syncing entities from Home Assistant to database");
-
-	try {
-		// Get all entity states from Home Assistant
-		const statesRes = await fetch(`${hassioEndpoint}/api/states`, {
-			headers: {
-				Authorization: `Bearer ${hassioToken}`,
-				"Content-Type": "application/json",
-			},
-		});
-
-		if (!statesRes.ok) {
-			throw new Error(`States fetch failed: ${statesRes.status}`);
-		}
-
-		const states = await statesRes.json();
-		if (!Array.isArray(states)) {
-			throw new Error("Invalid states response from Home Assistant");
-		}
-
-		// Ensure we have a default source
-		await db.prepare(`
-			INSERT OR IGNORE INTO sources (id, kind, base_ws_url, created_at, updated_at)
-			VALUES ('default', 'home_assistant', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`).bind(hassioEndpoint.replace(/^http/, 'ws') + '/api/websocket').run();
-
-		let synced = 0;
-		let errors = 0;
-
-		// Process each entity state
-		for (const state of states) {
-			try {
-				if (!state.entity_id) continue;
-
-				const [domain, object_id] = state.entity_id.split('.', 2);
-				if (!domain || !object_id) continue;
-
-				const friendlyName = state.attributes?.friendly_name || null;
-				const icon = state.attributes?.icon || null;
-				const unitOfMeasure = state.attributes?.unit_of_measurement || null;
-				const area = state.attributes?.area_id || null;
-
-				// Insert or update entity
-				await db.prepare(`
-					INSERT OR REPLACE INTO entities (
-						id, source_id, domain, object_id, friendly_name, icon,
-						unit_of_measure, area, is_enabled, last_seen_at,
-						metadata_json, updated_at
-					) VALUES (?, 'default', ?, ?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)
-				`).bind(
-					state.entity_id,
-					domain,
-					object_id,
-					friendlyName,
-					icon,
-					unitOfMeasure,
-					area,
-					JSON.stringify({
-						unique_id: state.attributes?.unique_id,
-						device_id: state.attributes?.device_id,
-						device_class: state.attributes?.device_class,
-						entity_category: state.attributes?.entity_category,
-					})
-				).run();
-
-				synced++;
-			} catch (entityError) {
-				logger.error(`Failed to sync entity ${state.entity_id}:`, entityError);
-				errors++;
-			}
-		}
-
-		logger.debug(`Entity sync complete: ${synced} synced, ${errors} errors`);
-		return { synced, errors };
-	} catch (error) {
-		logger.error("Entity sync failed:", error);
-		throw error;
-	}
-}

@@ -9,7 +9,7 @@
 
 import { Hono } from "hono";
 import { brainSweep } from "./lib/brain";
-import { HaWebSocketClient } from "./lib/homeAssistantWs";
+import { getHaClient } from "./lib/homeAssistantWs";
 import { logger } from "./lib/logger";
 import { v1 } from "./routes/v1";
 
@@ -101,11 +101,7 @@ app.get("/health", async (c) => {
 	let websocketApiStatus = false;
 	if (hasCredentials) {
 		try {
-			// Create a fresh WebSocket client instance for health checks to avoid connection pooling issues
-			const healthCheckClient = new HaWebSocketClient(
-				c.env.HASSIO_ENDPOINT_URI,
-				c.env.HASSIO_TOKEN,
-			);
+			const healthCheckClient = getHaClient(c.env);
 			const configResponse = await Promise.race([
 				healthCheckClient.getConfig(),
 				new Promise((_, reject) =>

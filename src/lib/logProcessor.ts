@@ -198,3 +198,70 @@ export function formatLogsForAI(processedLogs: ProcessedLogs): string {
 
 	return sections.join("\n");
 }
+
+/**
+ * Parse Home Assistant error log text into structured log entries.
+ */
+export function parseErrorLogText(logText: string): LogEntry[] {
+  const lines = logText.split("\n").filter((line) => line.trim());
+  const logs: LogEntry[] = [];
+
+  for (const line of lines) {
+    const match = line.match(
+      /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s+(\w+)\s+([^:]+):\s*(.+)$/,
+    );
+    if (match) {
+      logs.push({
+        timestamp: match[1],
+        level: match[2],
+        logger: match[3].trim(),
+        message: match[4].trim(),
+      });
+    } else if (line.trim()) {
+      logs.push({
+        timestamp: new Date().toISOString(),
+        level: "INFO",
+        logger: "unknown",
+        message: line.trim(),
+      });
+    }
+  }
+
+  return logs;
+}
+
+/**
+ * Extract error information from Home Assistant states.
+ */
+export function extractErrorsFromStates(states: unknown[]): LogEntry[] {
+  const logs: LogEntry[] = [];
+  const now = new Date().toISOString();
+
+  if (Array.isArray(states)) {
+    for (const state of states) {
+      if (
+        typeof state === "object" &&
+        state !== null &&
+        "state" in state &&
+        "entity_id" in state
+      ) {
+        const stateObj = state as {
+          state: string;
+          entity_id: string;
+          last_changed?: string;
+        };
+        if (stateObj.state === "unavailable" || stateObj.state === "unknown") {
+          logs.push({
+            timestamp: stateObj.last_changed || now,
+            level: "WARNING",
+            logger: "entity_state",
+            message: `Entity ${stateObj.entity_id} is ${stateObj.state}`,
+            source: "state_analysis",
+          });
+        }
+      }
+    }
+  }
+
+  return logs;
+}
