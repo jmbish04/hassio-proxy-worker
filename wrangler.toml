@@ -1,32 +1,57 @@
-name = "hassio-proxy-worker"
-main = "dist/index.js"
+name = "hassio-proxy"
+main = "src/index.ts"
 compatibility_date = "2025-08-01"
+
+[vars]
+DEFAULT_TEXT_MODEL = "@cf/openai/gpt-oss-120b"
+DEFAULT_OBJECT_MODEL = "@cf/facebook/detr-resnet-50"
+DEFAULT_FACE_MODEL = "@cf/microsoft/resnet-50"
+DEFAULT_VISION_MODEL = "@cf/llava-hf/llava-1.5-7b-hf"
+# Home Assistant Configuration - These are setup as secrets
+## HASSIO_ENDPOINT_URI - Your Home Assistant URL (e.g., "http://homeassistant.local:8123")
+## HASSIO_TOKEN - Your long-lived access token from Home Assistant
+# All UniFi Protect integration happens through Home Assistant APIs
+
+# CRON triggers for automated brain processing
+[triggers]
+crons = [ "0 9 * * 1" ] # Weekly brain sweep: Every Monday at 09:00 UTC
 
 [ai]
 binding = "AI"
 
-# Placeholders so we don’t touch this again next PR
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[observability]
+enabled = true
+
 [[d1_databases]]
 binding = "D1_DB"
 database_name = "hassio_proxy_db"
-database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+database_id = "ba740a1f-2c2f-48cb-aeb6-470fe8dc329d"
+migrations_dir = "migrations"
 
 [[kv_namespaces]]
 binding = "CONFIG_KV"
-id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+id = "2c6f36343c62419fa8fc0cbd4a0029ac"
 
 [[kv_namespaces]]
 binding = "SESSIONS_KV"
-id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+id = "919f3f3ae9fc4a058e038816a8329157"
 
 [[kv_namespaces]]
 binding = "CACHE_KV"
-id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+id = "cc09952642ca471fbdf8ab28ba3ab512"
 
 [[r2_buckets]]
 binding = "LOGS_BUCKET"
-bucket_name = "hassio-proxy-artifacts"
+bucket_name = "hassio-proxy-logs"
 
 [[durable_objects.bindings]]
 name = "WEBSOCKET_SERVER"
 class_name = "HomeAssistantWebSocket"
+
+[[migrations]]
+tag = "v1"
+new_classes = [ "HomeAssistantWebSocket" ]

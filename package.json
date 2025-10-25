@@ -1,25 +1,26 @@
 {
-  "name": "hassio-proxy-worker",
+  "name": "hassio-proxy",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "build": "tsc -p tsconfig.json",
-    "deploy": "pnpm build && wrangler deploy",
+    "deploy": "pnpm build && pnpm run migrate:remote && wrangler deploy",
+    "migrate:remote": "wrangler d1 migrations apply D1_DB --remote",
     "test": "vitest run"
   },
   "dependencies": {
+    "@hono/zod-validator": "^0.7.4",
     "ai": "^5.0.22",
     "hono": "^4.4.7",
     "workers-ai-provider": "^0.7.5",
-    "zod": "^3.25.0"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240512.0",
     "@types/node": "^20.14.9",
     "typescript": "^5.5.4",
     "vitest": "^1.6.0",
-    "wrangler": "^3.60.0"
+    "wrangler": "^4.32.0"
   }
 }

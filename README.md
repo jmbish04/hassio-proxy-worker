@@ -7,6 +7,14 @@ This draft sets the foundation for an **Alexa-skill REST API**:
 - `wrangler.toml` now points to **dist/index.js** and includes placeholder bindings for **D1**, **KV**, **R2**.
 - TypeScript build pipeline via `tsconfig.json` and `pnpm build`.
 - `/v1/ai/summary` demonstrates Workers AI usage via the Vercel AI SDK.
+- **Configurable AI Models**: Environment variables for easy AI model switching without code changes.
+
+## Features
+
+- **✅ Generated Runtime Types**: Migrated from `@cloudflare/workers-types` to Wrangler v4 generated types
+- **✅ Configurable AI Models**: AI models are now configurable via environment variables (see `AI_MODELS.md`)
+- **✅ WebSocket Support**: Durable Object-based WebSocket server for real-time Home Assistant communication
+- **✅ Test Coverage**: Comprehensive test suite with 11 passing tests
 
 ## Dev
 ```bash
