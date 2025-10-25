@@ -40,9 +40,9 @@ const bindings: Env = {
       };
     }
   } as any, // Keep this as any since we're not testing D1 functionality
-  CONFIG_KV: createKVMock(configKVStore) as any,
-  SESSIONS_KV: createKVMock() as any,
-  CACHE_KV: createKVMock() as any,
+  CONFIG_KV: createKVMock(configKVStore),
+  SESSIONS_KV: createKVMock(),
+  CACHE_KV: createKVMock(),
   LOGS_BUCKET: { async put() {} } as any,
   AI: { async run() { return { response: 'diag' }; } } as any,
   WEBSOCKET_SERVER: {
