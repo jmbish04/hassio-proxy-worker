@@ -8,7 +8,7 @@
  */
 
 import { Hono } from 'hono';
-import { v1 } from './routes/v1';
+import { v1, apiRoutes } from './routes/v1';
 import type { Env } from './types';
 import { logger } from './lib/logger';
 import { brainSweep } from "./lib/brain";
@@ -197,6 +197,7 @@ app.get("/api/camera_proxy/:entity_id", async (c) => {
  * All routes defined in `src/routes/v1.ts` will be prefixed with `/v1`.
  */
 app.route("/v1", v1);
+app.route("/v1", apiRoutes);
 
 /**
  * @route {GET} /ws/:instanceId

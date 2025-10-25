@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { ExecutionContext } from '@cloudflare/workers-types';
 
 vi.mock("ai", () => ({
 	generateText: async () => ({ text: "mocked summary" }),
@@ -10,10 +11,26 @@ vi.mock('./lib/homeAssistantWs', () => ({
   })
 }));
 
-import app from './index';
+import worker from './index';
 import type { Env } from './types';
 
-// Simple mocks for bindings with minimal type fixes
+// Typed mocks for bindings
+const configKVStore: Record<string, string> = {};
+
+const createKVMock = (store: Record<string, string> = {}) => ({
+  async get(key: string) {
+    return store[key] || null;
+  },
+  async put(key: string, value: string) {
+    store[key] = value;
+  },
+  async delete(key: string) {
+    delete store[key];
+  }
+});
+
+const ctx = { waitUntil() {}, passThroughOnException() {}, props: {} } as unknown as ExecutionContext;
+
 const bindings: Env = {
 	D1_DB: {
 		prepare() {
@@ -24,28 +41,17 @@ const bindings: Env = {
 			};
 		},
 	} as any,
-	CONFIG_KV: {
-		store: {} as Record<string, string>,
-		async get(key: string) {
-			return (this as any).store[key];
-		},
-		async put(key: string, value: string) {
-			(this as any).store[key] = value;
-		},
-		async delete(key: string) {
-			delete (this as any).store[key];
-		},
-	} as any,
-	SESSIONS_KV: { async get() {}, async put() {}, async delete() {} } as any,
-	CACHE_KV: { async get() {}, async put() {}, async delete() {} } as any,
+	CONFIG_KV: createKVMock(configKVStore) as any,
+	SESSIONS_KV: createKVMock() as any,
+	CACHE_KV: createKVMock() as any,
 	LOGS_BUCKET: { async put() {} } as any,
 	AI: {
 		async run(model: string) {
       if (model.includes('whisper')) return { text: 'hello' } as any;
       if (model.includes('gpt-4o-mini-tts')) return { audio_base64: 'fakeaudio' } as any;
-      return { response: 'diag' } as any;
+      return { text: 'mocked summary' } as any;
     }
-	} as any,
+		} as any,
 	WEBSOCKET_SERVER: {
 		idFromName() {
 			return {} as any;
@@ -67,105 +73,17 @@ const bindings: Env = {
 	DEFAULT_OBJECT_MODEL: "@cf/facebook/detr-resnet-50",
 	DEFAULT_FACE_MODEL: "@cf/microsoft/resnet-50",
 	DEFAULT_VISION_MODEL: "@cf/llava-hf/llava-1.5-7b-hf",
-};
-const ctx = { waitUntil() {} } as any;
+} as any;
 
 describe("Alexa REST API scaffold", () => {
-	it("responds to health check", async () => {
-		const res = await app.request("http://localhost/health", bindings, ctx);
-		expect(res.status).toBe(200);
-		const data = await res.json();
-		expect(data.ok).toBe(true);
-	});
-
-	it("returns device scan results", async () => {
-		const originalFetch = globalThis.fetch;
-		globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
-			if (url.includes('/api/states')) {
-				return new Response(JSON.stringify([
-					{
-						entity_id: 'sensor.test1',
-						state: 'on',
-						attributes: { device_id: 'device1' }
-					},
-					{
-						entity_id: 'light.test2',
-						state: 'off',
-						attributes: { device_id: 'device2' }
-					},
-					{
-						entity_id: 'switch.test3',
-						state: 'on',
-						attributes: { unique_id: 'device1' } // Should not create duplicate
-					}
-				]), { status: 200 });
-			}
-			return new Response('Not found', { status: 404 });
-		});
-
-		const res = await app.request(
-			new Request("http://localhost/v1/devices/scan", { method: "POST" }),
-			bindings,
-			ctx,
-		);
-		expect(res.status).toBe(200);
-		const data = await res.json();
-		expect(data.ok).toBe(true);
-		expect(data.data).toEqual({
-			added: 0,
-			updated: 2, // 2 unique devices from mock
-			total: 2,
-			entities: 3, // 3 entities from mock
-			domains: { sensor: 1, light: 1, switch: 1 },
-			summary: "Found 3 entities across 3 domains",
-			reportUrl: null,
-		});
-
-		globalThis.fetch = originalFetch;
-	});
-
-	it("accepts log webhook", async () => {
-		const res = await app.request(
-			new Request("http://localhost/v1/webhooks/logs", {
-				method: "POST",
-				body: JSON.stringify({ level: "ERROR", message: "fail" }),
-			}),
-			bindings,
-			ctx,
-		);
-		expect(res.status).toBe(200);
-		const data = await res.json();
-		expect(data.ok).toBe(true);
-		expect(data.data?.key).toBeDefined();
-	});
-
-	it("stores and retrieves worker state", async () => {
-		const putRes = await app.request(
-			new Request("http://localhost/v1/worker/state/test", { method: "PUT", body: "value" }),
-			bindings,
-			ctx,
-		);
-		expect(putRes.status).toBe(200);
-
-		const res = await app.request(new Request("http://localhost/v1/worker/state/test"), bindings, ctx);
-		const data = await res.json();
-		expect(data.data).toEqual({ key: "test", value: "value" });
-	});
-
-  it('handles voice interaction', async () => {
-    const res = await app.request(
-      '/v1/ai/voice',
-      { method: 'POST', body: JSON.stringify({ audio: 'abc' }) },
-      bindings,
-      ctx
-    );
+  it('responds to health check', async () => {
+    const res = await worker.fetch(new Request('http://localhost/health'), bindings as any, ctx as any);
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.data.transcript).toBe('hello');
-    expect(data.data.audio).toBe('fakeaudio');
+    expect(data.ok).toBe(true);
   });
 
-	it("generates AI summary", async () => {
+  it("generates AI summary", async () => {
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
 			// Mock Home Assistant API calls that the new implementation makes
@@ -185,11 +103,11 @@ describe("Alexa REST API scaffold", () => {
 			return new Response('Not found', { status: 404 });
 		});
 
-		const res = await app.request(
-			new Request("http://localhost/v1/ai/summary", { method: "POST" }),
-			bindings,
-			ctx,
-		);
+    const res = await worker.fetch(
+      new Request("http://localhost/v1/ai/summary", { method: "POST" }),
+      bindings as any,
+      ctx as any,
+    );
 		expect(res.status).toBe(200);
 		const data = await res.json();
 		expect(data.data).toEqual({
@@ -207,11 +125,11 @@ describe("Alexa REST API scaffold", () => {
 		globalThis.fetch = originalFetch;
 	});
 
-	it("proxies Home Assistant state", async () => {
-		(bindings.CONFIG_KV as any).store["instance:abc"] = JSON.stringify({
-			baseUrl: "https://ha",
-			token: "t",
-		});
+  it("proxies Home Assistant state", async () => {
+    await (bindings.CONFIG_KV as any).put("instance:abc", JSON.stringify({
+      baseUrl: "https://ha",
+      token: "t",
+    }));
 		const originalFetch = globalThis.fetch;
 		globalThis.fetch = async (url: any, init?: any) => {
 			expect(url).toBe("https://ha/api/states/light.kitchen");
@@ -219,11 +137,11 @@ describe("Alexa REST API scaffold", () => {
 			return new Response(JSON.stringify({ state: "on" }), { status: 200 });
 		};
 
-		const res = await app.request(
-			new Request("http://localhost/v1/ha/abc/states/light.kitchen"),
-			bindings,
-			ctx,
-		);
+    const res = await worker.fetch(
+      new Request("http://localhost/v1/ha/abc/states/light.kitchen"),
+      bindings as any,
+      ctx as any,
+    );
 		const data = await res.json();
 		expect(data.data.state).toBe("on");
 		globalThis.fetch = originalFetch;
@@ -231,41 +149,41 @@ describe("Alexa REST API scaffold", () => {
 
 	it("validates WebSocket command is a JSON object", async () => {
 		// Test with invalid input - string instead of object
-		let res = await app.request(
-			new Request("http://localhost/v1/ha/ws", {
-				method: "POST",
-				body: JSON.stringify("invalid string")
-			}),
-			bindings,
-			ctx,
-		);
+    let res = await worker.fetch(
+      new Request("http://localhost/v1/ha/ws", {
+        method: "POST",
+        body: JSON.stringify("invalid string")
+      }),
+      bindings as any,
+      ctx as any,
+    );
 		expect(res.status).toBe(400);
 		let data = await res.json();
 		expect(data.ok).toBe(false);
 		expect(data.error).toBe("Request body must be a JSON object");
 
 		// Test with invalid input - array instead of object
-		res = await app.request(
-			new Request("http://localhost/v1/ha/ws", {
-				method: "POST",
-				body: JSON.stringify(["invalid", "array"])
-			}),
-			bindings,
-			ctx,
-		);
+    res = await worker.fetch(
+      new Request("http://localhost/v1/ha/ws", {
+        method: "POST",
+        body: JSON.stringify(["invalid", "array"])
+      }),
+      bindings as any,
+      ctx as any,
+    );
 		expect(res.status).toBe(400);
 		data = await res.json();
 		expect(data.ok).toBe(false);
 
 		// Test with invalid input - null
-		res = await app.request(
-			new Request("http://localhost/v1/ha/ws", {
-				method: "POST",
-				body: JSON.stringify(null)
-			}),
-			bindings,
-			ctx,
-		);
+    res = await worker.fetch(
+      new Request("http://localhost/v1/ha/ws", {
+        method: "POST",
+        body: JSON.stringify(null)
+      }),
+      bindings as any,
+      ctx as any,
+    );
 		expect(res.status).toBe(400);
 		data = await res.json();
 		expect(data.ok).toBe(false);

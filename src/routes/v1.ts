@@ -1,5 +1,6 @@
-<<<<<<< HEAD
 import { Hono } from "hono";
+import { z } from 'zod';
+import { zValidator } from '@hono/zod-validator';
 import type { WorkerEnv } from "../index";
 import { brainSweep } from "../lib/brain";
 import { haFetch } from "../lib/homeAssistant";
@@ -11,18 +12,18 @@ import {
   processHomeLogs,
 } from "../lib/logProcessor";
 import { ok } from "../lib/response";
-=======
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
-import { getInstanceConfig, haFetch } from '../lib/homeAssistant';
-import { getHaClient } from '../lib/homeAssistantWs';
-import { Env } from '../types';
-import {
-  textToSpeech,
-  textToSpeechEdge,
-  getVoice,
-} from '../lib/textToSpeech';
+
+export const v1 = new Hono<{ Bindings: WorkerEnv }>();
+
+v1.use("*", async (c, next) => {
+	logger.debug("[v1]", c.req.method, c.req.path);
+	await next();
+});
+
+// Additional API routes from main branch
+// Kept separate from `v1` to avoid changing existing behavior.
+import { getInstanceConfig } from '../lib/homeAssistant';
+import type { Env } from '../types';
 
 export const apiRoutes = new Hono<{ Bindings: Env }>();
 
@@ -43,17 +44,19 @@ apiRoutes.post(
     'json',
     z.object({
       audio: z.string(),
+      text: z.string().optional(),
+      voice: z.string().optional()
     }),
   ),
   async (c) => {
-    const { audio } = c.req.valid('json');
+    const { audio, text, voice } = c.req.valid('json');
     const ai = c.env.AI;
     const { text: transcript } = await ai.run('@cf/openai/whisper', {
       audio: Buffer.from(audio, 'base64'),
     });
-    const { audio_base64 } = await ai.run('@cf/elevenlabs/elevenlabs-tts', {
-      text: 'Hello from the worker',
-      voice: 'Rachel',
+    const { audio_base64 } = await ai.run('@cf/myshell-ai/melotts', {
+      text: text ?? 'Hello from the worker',
+      voice: voice ?? 'EN-US-LISA'
     });
     return c.json({
       ok: true,
@@ -66,19 +69,11 @@ apiRoutes.all('/ha/:instanceId/*', async (c) => {
   const { instanceId } = c.req.param();
   const url = new URL(c.req.url);
   const path = url.pathname.replace(`/v1/ha/${instanceId}`, '');
-  return haFetch(c.env, instanceId, path, {
+  return haFetch(c.env as any, instanceId, path, {
     method: c.req.method,
     headers: c.req.headers,
     body: c.req.body,
   });
-});
->>>>>>> main
-
-export const v1 = new Hono<{ Bindings: WorkerEnv }>();
-
-v1.use("*", async (c, next) => {
-	logger.debug("[v1]", c.req.method, c.req.path);
-	await next();
 });
 
 // AI Brain endpoints
@@ -784,74 +779,11 @@ v1.post("/protect/sync", async (c) => {
 	}
 });
 
-<<<<<<< HEAD
 v1.get("/protect/cameras", async (c) => {
 	logger.debug("protect cameras list requested");
 	return c.json(
 		ok("stub: list cameras", { total: 0, online: 0, offline: [], items: [] }),
 	);
-=======
-v1.post('/ai/voice', async (c) => {
-  const { audio } = await c.req.json<{ audio: string }>();
-  logger.debug('voice agent request');
-
-  // Speech to text
-  const sttRes: any = await c.env.AI.run('@cf/openai/whisper', {
-    audio
-  });
-  const transcript: string = sttRes.text || '';
-
-  let reply = '';
-  if (/status/i.test(transcript)) {
-    try {
-      const states: any[] = await getHaClient(c.env).getStates();
-      reply = `There are ${states?.length ?? 0} entities reported by Home Assistant.`;
-    } catch (err) {
-      logger.error('HA status error', err);
-      reply = 'Unable to retrieve Home Assistant status.';
-    }
-  } else {
-    const workersai = createWorkersAI({ binding: c.env.AI });
-    const result = await generateText({
-      model: workersai('@cf/openai/gpt-oss-120b') as any,
-      prompt: transcript
-    });
-    reply = result.text;
-  }
-
-  // Text to speech
-  const ttsRes: any = await c.env.AI.run('@cf/openai/gpt-4o-mini-tts', {
-    text: reply,
-    voice: 'alloy'
-  });
-
-  return c.json(ok('voice', { transcript, reply, audio: ttsRes.audio_base64 }));
-});
-
-v1.post('/webhooks/logs', async (c) => {
-  const log = await c.req.json();
-  const key = `logs/${Date.now()}-${crypto.randomUUID()}.json`;
-  await c.env.LOGS_BUCKET.put(key, JSON.stringify(log));
-
-  if (typeof log?.level === 'string' && log.level.toUpperCase() === 'ERROR') {
-    try {
-      const analysis = await c.env.AI.run('@cf/openai/gpt-oss-120b', {
-        prompt: `Analyze Home Assistant log and provide diagnostics:\n${JSON.stringify(log)}`,
-        max_tokens: 256
-      });
-      const id = crypto.randomUUID();
-      await c.env.D1_DB.prepare(
-        'INSERT INTO log_diagnostics (id, log_key, analysis, created_at) VALUES (?, ?, ?, ?)'
-      ).bind(id, key, analysis.response, Date.now()).run();
-    } catch (err) {
-      // swallow errors to avoid failing webhook
-      logger.error('Error during log analysis:', err);
-    }
-  }
-
-  logger.debug('log stored', key);
-  return c.json(ok('log stored', { key }));
->>>>>>> main
 });
 
 v1.post("/protect/cameras/:id/snapshot", async (c) => {
