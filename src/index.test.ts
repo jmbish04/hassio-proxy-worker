@@ -115,9 +115,10 @@ describe('Alexa REST API scaffold', () => {
   it('proxies Home Assistant state', async () => {
     configKVStore['instance:abc'] = JSON.stringify({ baseUrl: 'https://ha', token: 't' });
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = async (url: any, init?: any) => {
+    globalThis.fetch = async (url: RequestInfo, init?: RequestInit) => {
       expect(url).toBe('https://ha/api/states/light.kitchen');
-      expect(init.headers.Authorization).toBe('Bearer t');
+      const headers = new Headers(init?.headers);
+      expect(headers.get('Authorization')).toBe('Bearer t');
       return new Response(JSON.stringify({ state: 'on' }), { status: 200 });
     };
 
