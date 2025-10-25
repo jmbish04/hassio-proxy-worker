@@ -50,7 +50,7 @@ const bindings: Env = {
       return {} as any;
     },
     get() {
-      return { fetch: () => new Response('not implemented', { status: 501 }) };
+      return { fetch: (request: Request) => new Response('not implemented', { status: 501 }) };
     }
   } as any,
   HASSIO_ENDPOINT_URI: 'https://ha',
