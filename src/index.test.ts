@@ -8,18 +8,18 @@ import app from './index';
 import type { Env } from './index';
 
 // Improved mocks with better type safety while maintaining compatibility
-const kvMockBase = {
+const createKvMock = () => ({
   store: {} as Record<string, string>,
   async get(key: string): Promise<string | null> {
-    return (this as any).store[key] || null;
+    return this.store[key] || null;
   },
   async put(key: string, value: string): Promise<void> {
-    (this as any).store[key] = value;
+    this.store[key] = value;
   },
   async delete(key: string): Promise<void> {
-    delete (this as any).store[key];
+    delete this.store[key];
   }
-};
+});
 
 const bindings: Env = {
   D1_DB: {
